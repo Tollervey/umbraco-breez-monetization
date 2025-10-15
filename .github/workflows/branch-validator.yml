@@ -1,0 +1,14 @@
+name: Validate Branch Name
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Branch Name
+        uses: tj-actions/branch-names@v8
+        with:
+          regex: '^(feature|bugfix)/AB#[0-9]+-.*$'
+          invalid_branch_name_message: 'Branch name must follow the pattern: feature/AB#123-description or bugfix/AB#456-fix. Ensure it includes an Azure work item ID (e.g., AB#123).'
+          allowed_branches: 'main,develop'
