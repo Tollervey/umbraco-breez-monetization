@@ -1,9 +1,9 @@
 import {
-  LitElement,
-  css,
-  html,
-  customElement,
-  state,
+    LitElement,
+    css,
+    html,
+    customElement,
+    state,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { UUIButtonElement } from "@umbraco-cms/backoffice/external/uui";
@@ -13,116 +13,116 @@ import { umbracobreezmonetizationService, UserModel } from "../api/index.js";
 
 @customElement("example-dashboard")
 export class ExampleDashboardElement extends UmbElementMixin(LitElement) {
-  @state()
-  private _yourName?: string = "Press the button!";
+    @state()
+    private _yourName?: string = "Press the button!";
 
-  @state()
-  private _timeFromMrWolf?: Date;
+    @state()
+    private _timeFromMrWolf?: Date;
 
-  @state()
-  private _serverUserData?: UserModel;
+    @state()
+    private _serverUserData?: UserModel;
 
-  @state()
-  private _contextCurrentUser?: UmbCurrentUserModel;
+    @state()
+    private _contextCurrentUser?: UmbCurrentUserModel;
 
-  #notificationContext?: typeof UMB_NOTIFICATION_CONTEXT.TYPE;
+    #notificationContext?: typeof UMB_NOTIFICATION_CONTEXT.TYPE;
 
-  constructor() {
-    super();
+    constructor() {
+        super();
 
-    this.consumeContext(UMB_NOTIFICATION_CONTEXT, (notificationContext) => {
-      this.#notificationContext = notificationContext;
-    });
+        this.consumeContext(UMB_NOTIFICATION_CONTEXT, (notificationContext) => {
+            this.#notificationContext = notificationContext;
+        });
 
-    this.consumeContext(UMB_CURRENT_USER_CONTEXT, (currentUserContext) => {
-      // When we have the current user context
-      // We can observe properties from it, such as the current user or perhaps just individual properties
-      // When the currentUser object changes we will get notified and can reset the @state properrty
-      this.observe(
-        currentUserContext?.currentUser,
-        (currentUser) => {
-          this._contextCurrentUser = currentUser;
-        },
-        "_contextCurrentUser"
-      );
-    });
-  }
-
-  #onClickWhoAmI = async (ev: Event) => {
-    const buttonElement = ev.target as UUIButtonElement;
-    buttonElement.state = "waiting";
-
-    const { data, error } = await umbracobreezmonetizationService.whoAmI();
-
-    if (error) {
-      buttonElement.state = "failed";
-      console.error(error);
-      return;
+        this.consumeContext(UMB_CURRENT_USER_CONTEXT, (currentUserContext) => {
+            // When we have the current user context
+            // We can observe properties from it, such as the current user or perhaps just individual properties
+            // When the currentUser object changes we will get notified and can reset the @state properrty
+            this.observe(
+                currentUserContext?.currentUser,
+                (currentUser) => {
+                    this._contextCurrentUser = currentUser;
+                },
+                "_contextCurrentUser"
+            );
+        });
     }
 
-    if (data !== undefined) {
-      this._serverUserData = data;
-      buttonElement.state = "success";
-    }
+    #onClickWhoAmI = async (ev: Event) => {
+        const buttonElement = ev.target as UUIButtonElement;
+        buttonElement.state = "waiting";
 
-    if (this.#notificationContext) {
-      this.#notificationContext.peek("warning", {
-        data: {
-          headline: `You are ${this._serverUserData?.name}`,
-          message: `Your email is ${this._serverUserData?.email}`,
-        },
-      });
-    }
-  };
+        const { data, error } = await umbracobreezmonetizationService.whoAmI();
 
-  #onClickWhatsTheTimeMrWolf = async (ev: Event) => {
-    const buttonElement = ev.target as UUIButtonElement;
-    buttonElement.state = "waiting";
+        if (error) {
+            buttonElement.state = "failed";
+            console.error(error);
+            return;
+        }
 
-    // Getting a string - should I expect a datetime?!
-    const { data, error } = await umbracobreezmonetizationService.whatsTheTimeMrWolf();
+        if (data != null) {
+            this._serverUserData = data as UserModel;
+            buttonElement.state = "success";
+        }
 
-    if (error) {
-      buttonElement.state = "failed";
-      console.error(error);
-      return;
-    }
+        if (this.#notificationContext) {
+            this.#notificationContext.peek("warning", {
+                data: {
+                    headline: `You are ${this._serverUserData?.name}`,
+                    message: `Your email is ${this._serverUserData?.email}`,
+                },
+            });
+        }
+    };
 
-    if (data !== undefined) {
-      this._timeFromMrWolf = new Date(data);
-      buttonElement.state = "success";
-    }
-  };
+    #onClickWhatsTheTimeMrWolf = async (ev: Event) => {
+        const buttonElement = ev.target as UUIButtonElement;
+        buttonElement.state = "waiting";
 
-  #onClickWhatsMyName = async (ev: Event) => {
-    const buttonElement = ev.target as UUIButtonElement;
-    buttonElement.state = "waiting";
+        // Getting a string - should I expect a datetime?!
+        const { data, error } = await umbracobreezmonetizationService.whatsTheTimeMrWolf();
 
-    const { data, error } = await umbracobreezmonetizationService.whatsMyName();
+        if (error) {
+            buttonElement.state = "failed";
+            console.error(error);
+            return;
+        }
 
-    if (error) {
-      buttonElement.state = "failed";
-      console.error(error);
-      return;
-    }
+        if (data !== undefined) {
+            this._timeFromMrWolf = new Date(data);
+            buttonElement.state = "success";
+        }
+    };
 
-    this._yourName = data;
-    buttonElement.state = "success";
-  };
+    #onClickWhatsMyName = async (ev: Event) => {
+        const buttonElement = ev.target as UUIButtonElement;
+        buttonElement.state = "waiting";
 
-  render() {
-    return html`
+        const { data, error } = await umbracobreezmonetizationService.whatsMyName();
+
+        if (error) {
+            buttonElement.state = "failed";
+            console.error(error);
+            return;
+        }
+
+        this._yourName = data;
+        buttonElement.state = "success";
+    };
+
+    render() {
+        return html`
       <uui-box headline="Who am I?">
         <div slot="header">[Server]</div>
         <h2>
           <uui-icon name="icon-user"></uui-icon>${this._serverUserData?.email
-            ? this._serverUserData.email
-            : "Press the button!"}
+                ? this._serverUserData.email
+                : "Press the button!"}
         </h2>
         <ul>
           ${this._serverUserData?.groups.map(
-            (group) => html`<li>${group.name}</li>`
-          )}
+                    (group) => html`<li>${group.name}</li>`
+                )}
         </ul>
         <uui-button
           color="default"
@@ -158,8 +158,8 @@ export class ExampleDashboardElement extends UmbElementMixin(LitElement) {
         <div slot="header">[Server]</div>
         <h2>
           <uui-icon name="icon-alarm-clock"></uui-icon> ${this._timeFromMrWolf
-            ? this._timeFromMrWolf.toLocaleString()
-            : "Press the button!"}
+                ? this._timeFromMrWolf.toLocaleString()
+                : "Press the button!"}
         </h2>
         <uui-button
           color="default"
@@ -183,10 +183,10 @@ export class ExampleDashboardElement extends UmbElementMixin(LitElement) {
         >
       </uui-box>
     `;
-  }
+    }
 
-  static styles = [
-    css`
+    static styles = [
+        css`
       :host {
         display: grid;
         gap: var(--uui-size-layout-1);
@@ -206,13 +206,13 @@ export class ExampleDashboardElement extends UmbElementMixin(LitElement) {
         grid-column: span 3;
       }
     `,
-  ];
+    ];
 }
 
 export default ExampleDashboardElement;
 
 declare global {
-  interface HTMLElementTagNameMap {
-    "example-dashboard": ExampleDashboardElement;
-  }
+    interface HTMLElementTagNameMap {
+        "example-dashboard": ExampleDashboardElement;
+    }
 }

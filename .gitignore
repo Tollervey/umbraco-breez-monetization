@@ -5,6 +5,7 @@
 *.user
 *.userosscache
 *.sln.docstates
+*.dll
 
 # The Visual Studio metadata folder. This is the cause of your permission errors.
 # This folder is user-specific and should never be in source control.
@@ -12,7 +13,12 @@
 
 # Build results
 in/
-[Oo]bj/
+Obj/
+bin/
+
+# Ignore compiled JS and source maps in Umbraco App_Plugins
+wwwroot/App_Plugins/**/*.js
+wwwroot/App_Plugins/**/*.js.map
 
 # Umbraco-specific files and folders to ignore
 # These contain temporary data, caches, and logs that are specific to a local installation.

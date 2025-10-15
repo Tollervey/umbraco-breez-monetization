@@ -1,0 +1,14 @@
+{
+  "id": "umbraco_breez_monetization",
+  "name": "umbraco_breez_monetization",
+  "version": "0.0.0",
+  "allowTelemetry": true,
+  "extensions": [
+    {
+      "name": "umbracobreezmonetizationBundle",
+      "alias": "umbraco_breez_monetization.Bundle",
+      "type": "bundle",
+      "js": "/App_Plugins/umbracobreezmonetization/umbraco-breez-monetization.js"
+    }
+  ]
+}
