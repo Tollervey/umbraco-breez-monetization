@@ -11,6 +11,7 @@ using Umbraco.Cms.Web.Common.Controllers;
 using Umbraco.Cms.Web.BackOffice.Controllers;
 using Umbraco.Cms.Core.Services;
 using Microsoft.AspNetCore.Identity;
+using Tollervey.LightningPayments.Core.Models;
 using Umbraco.Extensions;
 using Umbraco.Cms.Core.Models.PublishedContent; // Ensure this is added if not present
 

@@ -1,4 +1,4 @@
-﻿namespace Tollervey.Umbraco.LightningPayments.Models
+namespace Tollervey.LightningPayments.Core.Models
 {
     /// <summary>
     /// Represents the status of a payment.

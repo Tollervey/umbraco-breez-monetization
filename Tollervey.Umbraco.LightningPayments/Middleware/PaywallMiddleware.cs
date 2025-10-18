@@ -2,6 +2,7 @@
 using Tollervey.Umbraco.LightningPayments.Models;
 using Tollervey.Umbraco.LightningPayments.Services;
 using System.Text.Json;
+using Tollervey.LightningPayments.Core.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 

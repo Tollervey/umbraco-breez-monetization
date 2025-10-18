@@ -1,4 +1,5 @@
-﻿using Tollervey.Umbraco.LightningPayments.Models;
+﻿using Tollervey.LightningPayments.Core.Models;
+using Tollervey.Umbraco.LightningPayments.Models;
 
 namespace Tollervey.Umbraco.LightningPayments.Services
 {

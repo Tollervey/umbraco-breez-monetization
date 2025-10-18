@@ -7,6 +7,7 @@ using Tollervey.Umbraco.LightningPayments.Models;
 using Tollervey.Umbraco.LightningPayments.Services;
 using System.Security.Cryptography;
 using System.Text;
+using Tollervey.LightningPayments.Core.Models;
 using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Tollervey.Umbraco.LightningPayments.Controllers

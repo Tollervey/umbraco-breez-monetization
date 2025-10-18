@@ -22,13 +22,6 @@
     <PackageReference Include="Breez.Sdk.Liquid" Version="0.11.7" />
     <PackageReference Include="BTCPayServer.Lightning.Common" Version="1.5.2" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
     <PackageReference Include="NBitcoin" Version="9.0.1" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" />
@@ -37,6 +30,10 @@
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="*" />
     <PackageReference Include="Umbraco.Cms.Api.Common" Version="*" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

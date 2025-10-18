@@ -1,4 +1,4 @@
-namespace Tollervey.Umbraco.LightningPayments
+namespace Tollervey.LightningPayments.Core
 {
     public static class Constants
     {

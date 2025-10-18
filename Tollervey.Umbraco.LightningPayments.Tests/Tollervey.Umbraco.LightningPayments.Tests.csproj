@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Core.csproj" />
     <ProjectReference Include="..\Tollervey.Umbraco.LightningPayments\Tollervey.Umbraco.LightningPayments.csproj" />
   </ItemGroup>
 

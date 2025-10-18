@@ -1,6 +1,6 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
-namespace Tollervey.Umbraco.LightningPayments.Models
+namespace Tollervey.LightningPayments.Core.Models
 {
 
     // NOTE: This is a simplified model. The actual Breez webhook payload may be more complex.
