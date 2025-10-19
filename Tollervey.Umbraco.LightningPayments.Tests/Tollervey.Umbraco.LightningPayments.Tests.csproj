@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Breez.csproj" />
-    <ProjectReference Include="..\Tollervey.Umbraco.LightningPayments\Tollervey.Umbraco.LightningPayments.csproj" />
   </ItemGroup>
 
   <ItemGroup>
