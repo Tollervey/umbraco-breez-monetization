@@ -1,6 +1,6 @@
-using Tollervey.LightningPayments.Core.Models;
+using Tollervey.LightningPayments.Breez.Models;
 
-namespace Tollervey.LightningPayments.Core.Services
+namespace Tollervey.LightningPayments.Breez.Services
 {
     /// <summary>
     /// Provides methods to manage and verify payment states.

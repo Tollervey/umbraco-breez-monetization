@@ -8,10 +8,10 @@ using Tollervey.Umbraco.LightningPayments.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.BackOffice.Controllers;
 using Umbraco.Cms.Core.Services;
-using Tollervey.LightningPayments.Core.Models;
+using Tollervey.LightningPayments.Breez.Models;
 using Umbraco.Extensions;
 using Umbraco.Cms.Core.Models.PublishedContent;
-using Tollervey.LightningPayments.Core.Services; // Ensure this is added if not present
+using Tollervey.LightningPayments.Breez.Services; // Ensure this is added if not present
 
 namespace Tollervey.Umbraco.LightningPayments.Controllers
 {

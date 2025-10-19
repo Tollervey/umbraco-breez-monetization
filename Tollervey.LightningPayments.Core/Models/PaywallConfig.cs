@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Tollervey.LightningPayments.Core.Models
+namespace Tollervey.LightningPayments.Breez.Models
 {
     public class PaywallConfig
     {

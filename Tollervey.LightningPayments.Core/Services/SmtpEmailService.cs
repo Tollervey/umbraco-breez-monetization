@@ -1,8 +1,8 @@
 using System.Net.Mail;
 using Microsoft.Extensions.Options;
-using Tollervey.LightningPayments.Core.Configuration;
+using Tollervey.LightningPayments.Breez.Configuration;
 
-namespace Tollervey.LightningPayments.Core.Services
+namespace Tollervey.LightningPayments.Breez.Services
 {
     public class SmtpEmailService : IEmailService
     {

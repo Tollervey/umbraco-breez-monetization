@@ -3,11 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Tollervey.LightningPayments.Core.Services;
+using Tollervey.LightningPayments.Breez.Services;
 
 #nullable disable
 
-namespace Tollervey.LightningPayments.Core.Migrations
+namespace Tollervey.LightningPayments.Breez.Migrations
 {
     [DbContext(typeof(PaymentDbContext))]
     [Migration("20251018193314_InitialCreate")]

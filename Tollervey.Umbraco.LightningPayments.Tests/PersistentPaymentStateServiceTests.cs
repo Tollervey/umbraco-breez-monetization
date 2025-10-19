@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Tollervey.LightningPayments.Core.Models;
-using Tollervey.LightningPayments.Core.Services;
+using Tollervey.LightningPayments.Breez.Models;
+using Tollervey.LightningPayments.Breez.Services;
 
 namespace MyExtensionsTests
 {

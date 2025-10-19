@@ -1,4 +1,4 @@
-namespace Tollervey.LightningPayments.Core.Models
+namespace Tollervey.LightningPayments.Breez.Models
 {
     /// <summary>
     /// Exception thrown for payment-related errors.

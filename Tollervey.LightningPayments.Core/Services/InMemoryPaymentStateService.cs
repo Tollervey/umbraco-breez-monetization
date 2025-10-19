@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
-using Tollervey.LightningPayments.Core.Models;
+using Tollervey.LightningPayments.Breez.Models;
 
-namespace Tollervey.LightningPayments.Core.Services
+namespace Tollervey.LightningPayments.Breez.Services
 {
     public class InMemoryPaymentStateService : IPaymentStateService
     {

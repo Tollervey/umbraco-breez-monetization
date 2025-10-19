@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace Tollervey.LightningPayments.Core.Services
+namespace Tollervey.LightningPayments.Breez.Services
 {
     public class PaymentDbContextFactory : IDesignTimeDbContextFactory<PaymentDbContext>
     {

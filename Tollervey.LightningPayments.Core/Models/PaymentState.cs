@@ -1,4 +1,4 @@
-namespace Tollervey.LightningPayments.Core.Models
+namespace Tollervey.LightningPayments.Breez.Models
 {
     /// <summary>
     /// Represents the status of a payment.

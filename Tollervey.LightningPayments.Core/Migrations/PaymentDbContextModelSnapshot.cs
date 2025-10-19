@@ -2,11 +2,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Tollervey.LightningPayments.Core.Services;
+using Tollervey.LightningPayments.Breez.Services;
 
 #nullable disable
 
-namespace Tollervey.LightningPayments.Core.Migrations
+namespace Tollervey.LightningPayments.Breez.Migrations
 {
     [DbContext(typeof(PaymentDbContext))]
     partial class PaymentDbContextModelSnapshot : ModelSnapshot

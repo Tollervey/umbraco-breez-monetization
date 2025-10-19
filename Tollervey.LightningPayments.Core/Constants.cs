@@ -1,4 +1,4 @@
-namespace Tollervey.LightningPayments.Core
+namespace Tollervey.LightningPayments.Breez
 {
     public static class Constants
     {

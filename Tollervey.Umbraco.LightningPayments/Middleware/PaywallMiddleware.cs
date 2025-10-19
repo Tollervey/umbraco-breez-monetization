@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.Text.Json;
-using Tollervey.LightningPayments.Core.Models;
-using Tollervey.LightningPayments.Core.Services;
+using Tollervey.LightningPayments.Breez.Models;
+using Tollervey.LightningPayments.Breez.Services;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 

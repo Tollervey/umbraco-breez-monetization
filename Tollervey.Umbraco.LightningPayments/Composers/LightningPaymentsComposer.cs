@@ -1,10 +1,9 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Tollervey.LightningPayments.Core.Configuration;
-using Tollervey.LightningPayments.Core.Services;
+using Tollervey.LightningPayments.Breez.Configuration;
+using Tollervey.LightningPayments.Breez.Services;
 using Tollervey.Umbraco.LightningPayments.Middleware;
-using Tollervey.Umbraco.LightningPayments.Services;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;

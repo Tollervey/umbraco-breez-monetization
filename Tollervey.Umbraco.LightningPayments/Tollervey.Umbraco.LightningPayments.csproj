@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Core.csproj" />
+    <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Breez.csproj" />
   </ItemGroup>
 
   <ItemGroup>

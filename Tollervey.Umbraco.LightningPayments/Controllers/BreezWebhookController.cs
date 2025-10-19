@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
-using Tollervey.LightningPayments.Core.Configuration;
-using Tollervey.LightningPayments.Core.Models;
-using Tollervey.LightningPayments.Core.Services;
+using Tollervey.LightningPayments.Breez.Configuration;
+using Tollervey.LightningPayments.Breez.Models;
+using Tollervey.LightningPayments.Breez.Services;
 using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Tollervey.Umbraco.LightningPayments.Controllers

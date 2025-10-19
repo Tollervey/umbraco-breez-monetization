@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
-using Tollervey.LightningPayments.Core.Models;
+using Tollervey.LightningPayments.Breez.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 

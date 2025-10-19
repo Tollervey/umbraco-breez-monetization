@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Tollervey.LightningPayments.Core.Configuration
+namespace Tollervey.LightningPayments.Breez.Configuration
 {
     /// <summary>
     /// Configuration settings for the Lightning Payments extension.
