@@ -157,14 +157,14 @@ namespace Tollervey.LightningPayments.Breez.Services
             }
         }
 
-        private class SdkLogger : Logger
+        internal class SdkLogger : Logger
         {
             private readonly ILogger<BreezSdkService> _logger;
             public SdkLogger(ILogger<BreezSdkService> logger) => _logger = logger;
             public void Log(LogEntry l) => _logger.LogInformation("BreezSDK: [{level}]: {line}", l.level, l.line);
         }
 
-        private class SdkEventListener : EventListener
+        internal class SdkEventListener : EventListener
         {
             private readonly ILogger<BreezSdkService> _logger;
             private readonly IServiceProvider _serviceProvider;

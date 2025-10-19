@@ -409,58 +409,58 @@ public class BreezSdkServiceTests
         // Can't directly test Directory.CreateDirectory, but coverage is hit if init is called
     }
 
-    //[TestMethod]
-    //public void SdkLogger_Log_CallsLoggerWithCorrectMessage()
-    //{
-    //    var logger = new BreezSdkService.SdkLogger(_loggerMock.Object);
+    [TestMethod]
+    public void SdkLogger_Log_CallsLoggerWithCorrectMessage()
+    {
+        var logger = new BreezSdkService.SdkLogger(_loggerMock.Object);
 
-    //    var logEntry = new LogEntry { level = "INFO", line = "Test log message" };
+        var logEntry = new LogEntry("INFO", "Test log message");
 
-    //    logger.Log(logEntry);
+        logger.Log(logEntry);
 
-    //    _loggerMock.Verify(l => l.Log(
-    //        LogLevel.Information,
-    //        It.IsAny<EventId>(),
-    //        It.Is<It.IsAnyType>((v, t) => v.ToString() == "BreezSDK: [INFO]: Test log message"),
-    //        null,
-    //        It.IsAny<Func<It.IsAnyType, Exception, string>>()),
-    //        Times.Once);
-    //}
+        _loggerMock.Verify(l => l.Log(
+            LogLevel.Information,
+            It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((v, t) => v.ToString() == "BreezSDK: [INFO]: Test log message"),
+            null,
+            It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.Once);
+    }
 
-    //[TestMethod]
-    //public async Task EventListener_OnNonPaymentSucceededEvent_OnlyLogsEvent()
-    //{
-    //    var sdkMock = new Mock<BindingLiquidSdk>();
-    //    SetupSdkInitialization(sdkMock.Object);
+    [TestMethod]
+    public async Task EventListener_OnNonPaymentSucceededEvent_OnlyLogsEvent()
+    {
+        var sdkMock = new Mock<BindingLiquidSdk>();
+        SetupSdkInitialization(sdkMock.Object);
 
-    //    _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
+        _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
 
-    //    var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
-    //    // Trigger initialization
-    //    var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-    //    await (Task)initMethod.Invoke(service, null);
+        // Trigger initialization
+        var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        await (Task)initMethod.Invoke(service, null);
 
-    //    // Find listener type
-    //    var nestedTypes = typeof(BreezSdkService).GetNestedTypes(BindingFlags.NonPublic);
-    //    var listenerType = nestedTypes.FirstOrDefault(t => t.Name == "SdkEventListener");
-    //    if (listenerType != null)
-    //    {
-    //        var constructor = listenerType.GetConstructor(new[] { typeof(IServiceProvider) });
-    //        var listenerInstance = constructor.Invoke(new object[] { _serviceProviderMock.Object }) as EventListener;
+        // Find listener type
+        var nestedTypes = typeof(BreezSdkService).GetNestedTypes(BindingFlags.NonPublic);
+        var listenerType = nestedTypes.FirstOrDefault(t => t.Name == "SdkEventListener");
+        if (listenerType != null)
+        {
+            var constructor = listenerType.GetConstructor(new[] { typeof(IServiceProvider) });
+            var listenerInstance = constructor.Invoke(new object[] { _serviceProviderMock.Object }) as EventListener;
 
-    //        // Simulate a non-PaymentSucceeded event, e.g., a custom or other event
-    //        var otherEvent = new SdkEvent.BackupStarted(); // Assuming BackupStarted exists or use a mock
+            // Simulate a non-PaymentSucceeded event, e.g., Synced
+            var otherEvent = new SdkEvent.Synced();
 
-    //        listenerInstance.OnEvent(otherEvent);
+            listenerInstance.OnEvent(otherEvent);
 
-    //        _loggerMock.Verify(l => l.LogInformation("BreezSDK: Received event of type {EventType}: {EventDetails}", "BackupStarted", It.IsAny<string>()), Times.Once);
-    //    }
-    //    else
-    //    {
-    //        Assert.Fail("Could not find SdkEventListener type");
-    //    }
-    //}
+            _loggerMock.Verify(l => l.LogInformation("BreezSDK: Received event of type {EventType}: {EventDetails}", "Synced", It.IsAny<string>()), Times.Once);
+        }
+        else
+        {
+            Assert.Fail("Could not find SdkEventListener type");
+        }
+    }
 
     [TestMethod]
     public async Task DisposeAsync_HandlesDisconnectException()
