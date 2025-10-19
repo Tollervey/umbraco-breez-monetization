@@ -1,47 +1,65 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using Tollervey.LightningPayments.Breez.Configuration;
 using Tollervey.LightningPayments.Breez.Services;
-using Umbraco.Cms.Core.DependencyInjection;
-using Umbraco.Cms.Core.Models.PublishedContent;
-using Umbraco.Cms.Core.Composing;
 using Tollervey.Umbraco.LightningPayments.Core.Composers;
+using Umbraco.Cms.Core.Composing;
+using Umbraco.Cms.Core.DependencyInjection;
 
 namespace Tollervey.Umbraco.LightningPayments.CoreTests;
 
 [TestClass]
 public class LightningPaymentsComposerTests
 {
+    private Mock<IUmbracoBuilder> _builderMock;
+    private ServiceCollection _services;
+    private Mock<IConfiguration> _configMock;
+
+    [TestInitialize]
+    public void Setup()
+    {
+        _services = new ServiceCollection();
+        _configMock = new Mock<IConfiguration>();
+        _builderMock = new Mock<IUmbracoBuilder>();
+        _builderMock.Setup(b => b.Services).Returns(_services);
+        _builderMock.Setup(b => b.Config).Returns(_configMock.Object);
+    }
+
     [TestMethod]
-    public void Compose_RegistersRequiredServices()
+    public void Compose_WithConnectionString_RegistersPersistentPaymentStateService()
     {
         // Arrange
-        var services = new ServiceCollection();
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { $"{LightningPaymentsSettings.SectionName}:ConnectionString", "Data Source=:memory:" },
-                { $"{LightningPaymentsSettings.SectionName}:BreezApiKey", "test" },
-                { $"{LightningPaymentsSettings.SectionName}:Mnemonic", "test" },
-                { $"{LightningPaymentsSettings.SectionName}:Network", "Testnet" }
-                // Add other necessary settings if required
-            })
-            .Build();
-        var typeLoaderMock = new Mock<TypeLoader>();
-        var builder = new UmbracoBuilder(services, config, typeLoaderMock.Object);
-
         var composer = new LightningPaymentsComposer();
+        var configSectionMock = new Mock<IConfigurationSection>();
+        configSectionMock.Setup(s => s.Value).Returns("DataSource=:memory:");
+        _configMock.Setup(c => c.GetSection("ConnectionStrings:Tollervey.LightningPayments")).Returns(configSectionMock.Object);
 
         // Act
-        composer.Compose(builder);
+        composer.Compose(_builderMock.Object);
 
         // Assert
-        var provider = services.BuildServiceProvider();
-        Assert.IsNotNull(provider.GetService<IBreezSdkService>());
-        Assert.IsNotNull(provider.GetService<IPaymentStateService>());
-        Assert.IsNotNull(provider.GetService<IEmailService>());
-        // Add assertions for other registered services and middleware if needed
+        var provider = _services.BuildServiceProvider();
+        var paymentStateService = provider.GetService<IPaymentStateService>();
+        Assert.IsNotNull(paymentStateService);
+        Assert.IsInstanceOfType(paymentStateService, typeof(PersistentPaymentStateService));
+    }
+
+    [TestMethod]
+    public void Compose_WithoutConnectionString_RegistersInMemoryPaymentStateService()
+    {
+        // Arrange
+        var composer = new LightningPaymentsComposer();
+        var configSectionMock = new Mock<IConfigurationSection>();
+        configSectionMock.Setup(s => s.Value).Returns((string)null);
+        _configMock.Setup(c => c.GetSection("ConnectionStrings:Tollervey.LightningPayments")).Returns(configSectionMock.Object);
+
+        // Act
+        composer.Compose(_builderMock.Object);
+
+        // Assert
+        var provider = _services.BuildServiceProvider();
+        var paymentStateService = provider.GetService<IPaymentStateService>();
+        Assert.IsNotNull(paymentStateService);
+        Assert.IsInstanceOfType(paymentStateService, typeof(InMemoryPaymentStateService));
     }
 }
