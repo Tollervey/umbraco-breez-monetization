@@ -40,6 +40,7 @@ namespace Tollervey.Umbraco.LightningPayments.Core.Composers
             });
             builder.Services.AddScoped<IPaymentStateService, PersistentPaymentStateService>();
             builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+            builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
             builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
 
             // Register middleware
