@@ -130,6 +130,14 @@ public class InMemoryPaymentStateServiceTests
     }
 
     [TestMethod]
+    public async Task MarkAsExpiredAsync_ReturnsFalseIfNotExists()
+    {
+        var success = await _service.MarkAsExpiredAsync("nonexistent");
+
+        Assert.IsFalse(success);
+    }
+
+    [TestMethod]
     public async Task MarkAsRefundPendingAsync_MarksIfExists()
     {
         var paymentHash = "hash1";
@@ -143,6 +151,14 @@ public class InMemoryPaymentStateServiceTests
     }
 
     [TestMethod]
+    public async Task MarkAsRefundPendingAsync_ReturnsFalseIfNotExists()
+    {
+        var success = await _service.MarkAsRefundPendingAsync("nonexistent");
+
+        Assert.IsFalse(success);
+    }
+
+    [TestMethod]
     public async Task MarkAsRefundedAsync_MarksIfExists()
     {
         var paymentHash = "hash1";
@@ -153,6 +169,14 @@ public class InMemoryPaymentStateServiceTests
         Assert.IsTrue(success);
         var state = (await _service.GetAllPaymentsAsync()).First();
         Assert.AreEqual(PaymentStatus.Refunded, state.Status);
+    }
+
+    [TestMethod]
+    public async Task MarkAsRefundedAsync_ReturnsFalseIfNotExists()
+    {
+        var success = await _service.MarkAsRefundedAsync("nonexistent");
+
+        Assert.IsFalse(success);
     }
 
     [TestMethod]
