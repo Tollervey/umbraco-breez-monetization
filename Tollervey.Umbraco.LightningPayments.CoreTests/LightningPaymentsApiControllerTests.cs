@@ -2,15 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Security.Claims;
+using System.Security.Principal;
+using Tollervey.LightningPayments.Breez.Models;
 using Tollervey.LightningPayments.Breez.Services;
 using Tollervey.Umbraco.LightningPayments.Core.Controllers;
-using Tollervey.Umbraco.LightningPayments.Core.Models;
-using Umbraco.Cms.Core.Models.PublishedContent;
-using Umbraco.Cms.Core.PublishedCache; // Added for IPublishedContentCache
+using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
-using Umbraco.Cms.Web.Common.Controllers;
-using Umbraco.Extensions;
 
 namespace Tollervey.Umbraco.LightningPayments.CoreTests;
 
@@ -39,76 +38,81 @@ public class LightningPaymentsApiControllerTests
             _umbracoContextAccessorMock.Object,
             _loggerMock.Object,
             _userServiceMock.Object);
+
+        var httpContext = new DefaultHttpContext();
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext
+        };
     }
 
     [TestMethod]
-    public async Task GetPaywallInvoice_InvalidContentId_ReturnsBadRequest()
+    public async Task GetPaymentStatus_NoSession_ReturnsUnauthorized()
     {
         // Act
-        var result = await _controller.GetPaywallInvoice(0);
+        var result = await _controller.GetPaymentStatus(1);
 
         // Assert
-        Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+        Assert.IsInstanceOfType(result, typeof(UnauthorizedResult));
     }
 
     [TestMethod]
-    public async Task GetPaywallInvoice_ContentNotFound_ReturnsNotFound()
+    public async Task GetPaymentStatus_WithSession_ReturnsOk()
     {
         // Arrange
-        var umbracoContextMock = new Mock<IUmbracoContext>();
-        var contentCacheMock = new Mock<IPublishedContentCache>();
-        contentCacheMock.Setup(c => c.GetById(It.IsAny<int>())).Returns((IPublishedContent?)null);
-        umbracoContextMock.Setup(c => c.Content).Returns(contentCacheMock.Object);
-        IUmbracoContext outContext = umbracoContextMock.Object;
-        _umbracoContextAccessorMock.Setup(a => a.TryGetUmbracoContext(out outContext)).Returns(true);
+        var sessionId = "test-session";
+        _controller.Request.Headers.Cookie = $"LightningPaymentsSession={sessionId}";
+        _paymentStateServiceMock.Setup(s => s.GetPaymentStateAsync(sessionId, 1))
+            .ReturnsAsync(new PaymentState { Status = PaymentStatus.Paid });
 
         // Act
-        var result = await _controller.GetPaywallInvoice(1);
+        var result = await _controller.GetPaymentStatus(1);
 
         // Assert
-        Assert.IsInstanceOfType(result, typeof(NotFoundObjectResult));
+        Assert.IsInstanceOfType(result, typeof(OkObjectResult));
     }
 
     [TestMethod]
-    public async Task GetPaywallInvoice_PaywallDisabled_ReturnsBadRequest()
+    public async Task GetAllPayments_NotAdmin_ReturnsUnauthorized()
     {
         // Arrange
-        var umbracoContextMock = new Mock<IUmbracoContext>();
-        var contentCacheMock = new Mock<IPublishedContentCache>();
-        var contentMock = new Mock<IPublishedContent>();
-        contentMock.Setup(c => c.HasValue("breezPaywall")).Returns(true);
-        contentMock.Setup(c => c.Value<string>("breezPaywall")).Returns("{\"enabled\": false, \"fee\": 100}");
-        contentCacheMock.Setup(c => c.GetById(1)).Returns(contentMock.Object);
-        umbracoContextMock.Setup(c => c.Content).Returns(contentCacheMock.Object);
-        IUmbracoContext outContext = umbracoContextMock.Object;
-        _umbracoContextAccessorMock.Setup(a => a.TryGetUmbracoContext(out outContext)).Returns(true);
+        var identity = new ClaimsIdentity();
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "1"));
+        var principal = new ClaimsPrincipal(identity);
+        _controller.ControllerContext.HttpContext.User = principal;
+
+        var userMock = new Mock<IUser>();
+        var userGroup = new Mock<IReadOnlyUserGroup>();
+        userGroup.Setup(g => g.Name).Returns("Editors");
+        userMock.Setup(u => u.Groups).Returns(new[] { userGroup.Object });
+        _userServiceMock.Setup(s => s.GetUserById(1)).Returns(userMock.Object);
 
         // Act
-        var result = await _controller.GetPaywallInvoice(1);
+        var result = await _controller.GetAllPayments();
 
         // Assert
-        Assert.IsInstanceOfType(result, typeof(BadRequestObjectResult));
+        Assert.IsInstanceOfType(result, typeof(UnauthorizedResult));
     }
 
     [TestMethod]
-    public async Task GetPaywallInvoice_ValidRequest_ReturnsOkWithInvoice()
+    public async Task GetAllPayments_Admin_ReturnsOk()
     {
         // Arrange
-        var umbracoContextMock = new Mock<IUmbracoContext>();
-        var contentCacheMock = new Mock<IPublishedContentCache>();
-        var contentMock = new Mock<IPublishedContent>();
-        contentMock.Setup(c => c.HasValue("breezPaywall")).Returns(true);
-        contentMock.Setup(c => c.Value<string>("breezPaywall")).Returns("{\"enabled\": true, \"fee\": 100}");
-        contentCacheMock.Setup(c => c.GetById(1)).Returns(contentMock.Object);
-        umbracoContextMock.Setup(c => c.Content).Returns(contentCacheMock.Object);
-        IUmbracoContext outContext = umbracoContextMock.Object;
-        _umbracoContextAccessorMock.Setup(a => a.TryGetUmbracoContext(out outContext)).Returns(true);
+        var identity = new ClaimsIdentity();
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, "1"));
+        var principal = new ClaimsPrincipal(identity);
+        _controller.ControllerContext.HttpContext.User = principal;
 
-        _breezSdkServiceMock.Setup(s => s.CreateInvoiceAsync(100, It.IsAny<string>())).ReturnsAsync("test-invoice");
-        _paymentStateServiceMock.Setup(p => p.AddPendingPaymentAsync(It.IsAny<string>(), 1, It.IsAny<string>())).Returns(Task.CompletedTask);
+        var userMock = new Mock<IUser>();
+        var userGroup = new Mock<IReadOnlyUserGroup>();
+        userGroup.Setup(g => g.Name).Returns("Administrators");
+        userMock.Setup(u => u.Groups).Returns(new[] { userGroup.Object });
+        _userServiceMock.Setup(s => s.GetUserById(1)).Returns(userMock.Object);
+
+        _paymentStateServiceMock.Setup(s => s.GetAllPaymentsAsync()).ReturnsAsync(new List<PaymentState>());
 
         // Act
-        var result = await _controller.GetPaywallInvoice(1);
+        var result = await _controller.GetAllPayments();
 
         // Assert
         Assert.IsInstanceOfType(result, typeof(OkObjectResult));
