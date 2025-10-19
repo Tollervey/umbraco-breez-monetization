@@ -2,12 +2,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Tollervey.Umbraco.LightningPayments.Configuration;
-using Tollervey.Umbraco.LightningPayments.Models;
-using Tollervey.Umbraco.LightningPayments.Services;
 using System.Security.Cryptography;
 using System.Text;
+using Tollervey.LightningPayments.Core.Configuration;
 using Tollervey.LightningPayments.Core.Models;
+using Tollervey.LightningPayments.Core.Services;
 using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Tollervey.Umbraco.LightningPayments.Controllers

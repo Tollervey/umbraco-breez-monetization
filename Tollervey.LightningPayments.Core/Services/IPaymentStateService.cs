@@ -1,7 +1,6 @@
-﻿using Tollervey.LightningPayments.Core.Models;
-using Tollervey.Umbraco.LightningPayments.Models;
+using Tollervey.LightningPayments.Core.Models;
 
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     /// <summary>
     /// Provides methods to manage and verify payment states.

@@ -1,8 +1,7 @@
 using System.Collections.Concurrent;
 using Tollervey.LightningPayments.Core.Models;
-using Tollervey.Umbraco.LightningPayments.Models;
 
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     public class InMemoryPaymentStateService : IPaymentStateService
     {
@@ -59,8 +58,7 @@ namespace Tollervey.Umbraco.LightningPayments.Services
         {
             try
             {
-                if (_paymentHashBySession.TryGetValue($"{userSessionId}:{contentId}", out var paymentHash) &&
-                    _paymentStatesByHash.TryGetValue(paymentHash, out var state))
+                if (_paymentHashBySession.TryGetValue($"{userSessionId}:{contentId}", out var paymentHash) && _paymentStatesByHash.TryGetValue(paymentHash, out var state))
                 {
                     return Task.FromResult<PaymentState?>(state);
                 }

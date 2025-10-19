@@ -1,8 +1,8 @@
 using System.Net.Mail;
 using Microsoft.Extensions.Options;
-using Tollervey.Umbraco.LightningPayments.Configuration;
+using Tollervey.LightningPayments.Core.Configuration;
 
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     public class SmtpEmailService : IEmailService
     {

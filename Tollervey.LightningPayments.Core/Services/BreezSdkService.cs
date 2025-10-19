@@ -3,12 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
+using Tollervey.LightningPayments.Core.Configuration;
 using Tollervey.LightningPayments.Core.Models;
-using Tollervey.Umbraco.LightningPayments.Configuration;
-using Tollervey.Umbraco.LightningPayments.Models;
-using Umbraco.Cms.Core.Hosting;
-
+using Tollervey.LightningPayments.Core.Services;
 namespace Tollervey.Umbraco.LightningPayments.Services
 {
     public class BreezSdkService : IBreezSdkService

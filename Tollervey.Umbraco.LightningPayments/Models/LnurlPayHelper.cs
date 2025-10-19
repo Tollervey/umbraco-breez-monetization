@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Text.Json;
 using Tollervey.LightningPayments.Core.Models;
-using Tollervey.Umbraco.LightningPayments.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 

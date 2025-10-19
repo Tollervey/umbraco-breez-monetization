@@ -1,6 +1,4 @@
-﻿using Tollervey.Umbraco.LightningPayments.Configuration;
-
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     public interface IBreezSdkService : IAsyncDisposable
     {

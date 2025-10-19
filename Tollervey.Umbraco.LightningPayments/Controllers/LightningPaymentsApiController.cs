@@ -5,15 +5,13 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Tollervey.Umbraco.LightningPayments.Middleware;
 using Tollervey.Umbraco.LightningPayments.Models;
-using Tollervey.Umbraco.LightningPayments.Services;
 using Umbraco.Cms.Core.Web;
-using Umbraco.Cms.Web.Common.Controllers;
 using Umbraco.Cms.Web.BackOffice.Controllers;
 using Umbraco.Cms.Core.Services;
-using Microsoft.AspNetCore.Identity;
 using Tollervey.LightningPayments.Core.Models;
 using Umbraco.Extensions;
-using Umbraco.Cms.Core.Models.PublishedContent; // Ensure this is added if not present
+using Umbraco.Cms.Core.Models.PublishedContent;
+using Tollervey.LightningPayments.Core.Services; // Ensure this is added if not present
 
 namespace Tollervey.Umbraco.LightningPayments.Controllers
 {

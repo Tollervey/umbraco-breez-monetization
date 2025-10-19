@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
-namespace Tollervey.Umbraco.LightningPayments.Configuration
+namespace Tollervey.LightningPayments.Core.Configuration
 {
     /// <summary>
     /// Configuration settings for the Lightning Payments extension.

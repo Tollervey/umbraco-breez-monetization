@@ -1,4 +1,4 @@
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     public interface IEmailService
     {

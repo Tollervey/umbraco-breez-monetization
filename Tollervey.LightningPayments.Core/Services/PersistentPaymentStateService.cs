@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tollervey.LightningPayments.Core.Models;
-using Tollervey.Umbraco.LightningPayments.Models;
 
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     /// <summary>
     /// Persistent implementation of IPaymentStateService using Entity Framework Core and SQLite.

@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Tollervey.Umbraco.LightningPayments.Configuration;
 
-namespace Tollervey.Umbraco.LightningPayments.Services
+namespace Tollervey.LightningPayments.Core.Services
 {
     public class PaymentDbContextFactory : IDesignTimeDbContextFactory<PaymentDbContext>
     {

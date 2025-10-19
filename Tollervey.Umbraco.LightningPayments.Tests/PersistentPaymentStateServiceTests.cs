@@ -1,8 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Tollervey.LightningPayments.Core.Models;
-using Tollervey.Umbraco.LightningPayments.Models;
-using Tollervey.Umbraco.LightningPayments.Services;
+using Tollervey.LightningPayments.Core.Services;
 
 namespace MyExtensionsTests
 {

@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Tollervey.Umbraco.LightningPayments.Configuration;
+using Tollervey.LightningPayments.Core.Configuration;
+using Tollervey.LightningPayments.Core.Services;
 using Tollervey.Umbraco.LightningPayments.Middleware;
 using Tollervey.Umbraco.LightningPayments.Services;
 using Umbraco.Cms.Core.Composing;
