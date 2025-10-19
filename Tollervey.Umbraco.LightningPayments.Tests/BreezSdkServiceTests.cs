@@ -500,6 +500,91 @@ public class BreezSdkServiceTests
         _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.AtLeastOnce); // Logs the error
     }
 
+    [TestMethod]
+    public async Task InitializeSdkAsync_ConcurrentCalls_InitializesOnlyOnce()
+    {
+        // Arrange
+        var sdkMock = new Mock<BindingLiquidSdk>();
+        SetupSdkInitialization(sdkMock.Object);
+
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        // Act
+        var tasks = Enumerable.Range(0, 5).Select(i => (Task<BindingLiquidSdk?>)method.Invoke(service, null)).ToArray();
+        await Task.WhenAll(tasks);
+
+        // Assert
+        _wrapperMock.Verify(w => w.Connect(It.IsAny<ConnectRequest>()), Times.Once);
+        foreach (var task in tasks)
+        {
+            Assert.IsNotNull(await task);
+        }
+    }
+
+    [TestMethod]
+    public async Task EventListener_OnPaymentSucceededEvent_HandlesExceptionInConfirm()
+    {
+        // Arrange
+        var sdkMock = new Mock<BindingLiquidSdk>();
+        SetupSdkInitialization(sdkMock.Object);
+
+        var paymentStateServiceMock = new Mock<IPaymentStateService>();
+        paymentStateServiceMock.Setup(p => p.ConfirmPaymentAsync(It.IsAny<string>())).ThrowsAsync(new Exception("Confirm error"));
+
+        var serviceScopeMock = new Mock<IServiceScope>();
+        serviceScopeMock.Setup(s => s.ServiceProvider.GetService(typeof(IPaymentStateService))).Returns(paymentStateServiceMock.Object);
+        serviceScopeMock.Setup(s => s.ServiceProvider.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
+
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        scopeFactoryMock.Setup(f => f.CreateScope()).Returns(serviceScopeMock.Object);
+
+        _serviceProviderMock.Setup(sp => sp.GetService(typeof(IServiceScopeFactory))).Returns(scopeFactoryMock.Object);
+        _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
+
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Trigger initialization
+        var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        await (Task)initMethod.Invoke(service, null);
+
+        // Find listener type
+        var nestedTypes = typeof(BreezSdkService).GetNestedTypes(BindingFlags.NonPublic);
+        var listenerType = nestedTypes.FirstOrDefault(t => t.Name == "SdkEventListener");
+        if (listenerType == null)
+        {
+            Assert.Fail("Could not find SdkEventListener type");
+        }
+
+        var constructor = listenerType.GetConstructor(new[] { typeof(IServiceProvider) });
+        var listenerInstance = constructor.Invoke(new object[] { _serviceProviderMock.Object }) as EventListener;
+
+        // Simulate event
+        dynamic details = new ExpandoObject();
+        details.paymentHash = "test-hash";
+
+        dynamic paymentDynamic = new ExpandoObject();
+        paymentDynamic.details = details;
+
+        // Create a dummy Payment
+        var dummyPayment = new Payment(1, 1000UL, 100UL, PaymentType.Receive, Breez.Sdk.Liquid.PaymentState.Complete, new Breez.Sdk.Liquid.PaymentDetails(), 1234567890UL, null, null, null);
+
+        var paymentSucceededType = typeof(SdkEvent.PaymentSucceeded);
+        var testSucceeded = Activator.CreateInstance(paymentSucceededType, dummyPayment) as SdkEvent.PaymentSucceeded;
+
+        var onEventMethod = listenerType.GetMethod("OnEvent");
+        onEventMethod.Invoke(listenerInstance, new object[] { testSucceeded });
+
+        // Wait for the task to complete
+        await Task.Delay(500);
+
+        // Assert
+        paymentStateServiceMock.Verify(p => p.ConfirmPaymentAsync("test-hash"), Times.Once);
+        _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), "Failed to confirm payment from SDK event."), Times.Once);
+        _loggerMock.Verify(l => l.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", "test-hash"), Times.Never);
+    }
+
     private void SetupSdkInitialization(BindingLiquidSdk sdk)
     {
         var config = BreezSdkLiquidMethods.DefaultConfig(LiquidNetwork.Testnet, "test-api-key");
