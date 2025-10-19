@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using Tollervey.LightningPayments.Breez.Models;
 using Tollervey.LightningPayments.Breez.Services;
 
@@ -9,12 +10,17 @@ namespace Tollervey.Umbraco.LightningPayments.Tests
     {
         private readonly PaymentDbContext _context;
         private readonly PersistentPaymentStateService _service;
+        private readonly SqliteConnection _connection;
 
         public PersistentPaymentStateServiceTests()
         {
+            _connection = new SqliteConnection("Data Source=:memory:");
+            _connection.Open();
+
             var options = new DbContextOptionsBuilder<PaymentDbContext>()
-                .UseSqlite("Data Source=:memory:")
+                .UseSqlite(_connection)
                 .Options;
+
             _context = new PaymentDbContext(options);
             _context.Database.EnsureCreated();
             _service = new PersistentPaymentStateService(_context);
@@ -307,6 +313,7 @@ namespace Tollervey.Umbraco.LightningPayments.Tests
         public void Dispose()
         {
             _context.Dispose();
+            _connection.Dispose();
         }
     }
 }
