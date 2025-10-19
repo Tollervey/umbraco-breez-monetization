@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using BTCPayServer.Lightning;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Tollervey.Umbraco.LightningPayments.Middleware;
-using Tollervey.Umbraco.LightningPayments.Models;
+using Tollervey.Umbraco.LightningPayments.Core.Middleware;
+using Tollervey.Umbraco.LightningPayments.Core.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.BackOffice.Controllers;
 using Umbraco.Cms.Core.Services;
@@ -13,7 +13,7 @@ using Umbraco.Extensions;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Tollervey.LightningPayments.Breez.Services; // Ensure this is added if not present
 
-namespace Tollervey.Umbraco.LightningPayments.Controllers
+namespace Tollervey.Umbraco.LightningPayments.Core.Controllers
 {
     [RequireHttps]
     public class LightningPaymentsApiController : UmbracoAuthorizedApiController

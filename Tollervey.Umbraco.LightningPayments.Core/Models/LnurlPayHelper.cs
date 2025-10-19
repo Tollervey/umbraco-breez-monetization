@@ -6,7 +6,7 @@ using Tollervey.LightningPayments.Breez.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 
-namespace Tollervey.Umbraco.LightningPayments.Models
+namespace Tollervey.Umbraco.LightningPayments.Core.Models
 {
     public static class LnurlPayHelper
     {

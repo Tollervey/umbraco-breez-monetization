@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Tollervey.Umbraco.LightningPayments.Models;
+using Tollervey.Umbraco.LightningPayments.Core.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.Common.Controllers;
 
-namespace Tollervey.Umbraco.LightningPayments.Controllers
+namespace Tollervey.Umbraco.LightningPayments.Core.Controllers
 {
     [RequireHttps]
     public class WellKnownController : UmbracoApiControllerBase

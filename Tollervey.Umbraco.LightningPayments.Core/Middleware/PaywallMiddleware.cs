@@ -1,11 +1,11 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using System.Text.Json;
 using Tollervey.LightningPayments.Breez.Models;
 using Tollervey.LightningPayments.Breez.Services;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 
-namespace Tollervey.Umbraco.LightningPayments.Middleware
+namespace Tollervey.Umbraco.LightningPayments.Core.Middleware
 {
     public class PaywallMiddleware
     {

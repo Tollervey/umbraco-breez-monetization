@@ -10,7 +10,7 @@ using Umbraco.Cms.Infrastructure.Persistence;
 using Umbraco.Cms.Web.Website.Controllers;
 using Umbraco.Extensions;
 
-namespace Tollervey.Umbraco.LightningPayments.Controllers
+namespace Tollervey.Umbraco.LightningPayments.Core.Controllers
 {
     [RequireHttps]
     public class PaywallSurfaceController : SurfaceController

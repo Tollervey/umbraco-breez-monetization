@@ -9,7 +9,7 @@ using Tollervey.LightningPayments.Breez.Models;
 using Tollervey.LightningPayments.Breez.Services;
 using Umbraco.Cms.Web.Common.Controllers;
 
-namespace Tollervey.Umbraco.LightningPayments.Controllers
+namespace Tollervey.Umbraco.LightningPayments.Core.Controllers
 {
     [ApiController]
     [Route("umbraco/api/[controller]")]

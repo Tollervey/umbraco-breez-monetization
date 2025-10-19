@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
-namespace Tollervey.Umbraco.LightningPayments.Middleware
+namespace Tollervey.Umbraco.LightningPayments.Core.Middleware
 {
     public class ExceptionHandlingMiddleware
     {
