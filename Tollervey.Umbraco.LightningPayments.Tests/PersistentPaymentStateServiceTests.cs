@@ -13,9 +13,10 @@ namespace MyExtensionsTests
         public PersistentPaymentStateServiceTests()
         {
             var options = new DbContextOptionsBuilder<PaymentDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .UseSqlite("Data Source=:memory:")
                 .Options;
             _context = new PaymentDbContext(options);
+            _context.Database.EnsureCreated();
             _service = new PersistentPaymentStateService(_context);
         }
 
