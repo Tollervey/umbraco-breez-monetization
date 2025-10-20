@@ -250,13 +250,21 @@ namespace Tollervey.LightningPayments.Breez.Services
                         {
                             _token.ThrowIfCancellationRequested();
                             using var scope = _serviceProvider.CreateScope();
+                            var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
                             var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
                             dynamic succeededDynamic = succeeded;
                             string paymentHash = succeededDynamic.details.paymentHash;
 
+                            if (!deduper.TryBegin(paymentHash))
+                            {
+                                _logger.LogInformation("Duplicate payment succeeded event for hash: {PaymentHash}", paymentHash);
+                                return;
+                            }
+
                             _token.ThrowIfCancellationRequested();
                             await paymentService.ConfirmPaymentAsync(paymentHash);
                             _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
+                            deduper.Complete(paymentHash);
                         }
                         catch (Exception ex)
                         {

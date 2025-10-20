@@ -47,6 +47,8 @@ namespace Tollervey.Umbraco.LightningPayments.Core.Composers
             builder.Services.AddScoped<IEmailService, SmtpEmailService>();
             builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
             builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
+            builder.Services.AddMemoryCache();
+            builder.Services.AddSingleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>();
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
