@@ -39,12 +39,6 @@ namespace Tollervey.LightningPayments.Breez.Services
                 await _initSemaphore.WaitAsync(ct);
                 acquired = true;
 
-                if (string.IsNullOrWhiteSpace(_settings.BreezApiKey) || string.IsNullOrWhiteSpace(_settings.Mnemonic))
-                {
-                    _logger.LogWarning("Breez SDK credentials are not configured. Service will not start.");
-                    return null;
-                }
-
                 _logger.LogInformation("Initializing Breez SDK...");
                 _wrapper.SetLogger(new SdkLogger(_logger));
 
@@ -58,14 +52,8 @@ namespace Tollervey.LightningPayments.Breez.Services
                 {
                     LightningPaymentsSettings.LightningNetwork.Mainnet => LiquidNetwork.Mainnet,
                     LightningPaymentsSettings.LightningNetwork.Testnet => LiquidNetwork.Testnet,
-                    LightningPaymentsSettings.LightningNetwork.Regtest => LiquidNetwork.Regtest,
-                    _ => LiquidNetwork.Mainnet
+                    LightningPaymentsSettings.LightningNetwork.Regtest => LiquidNetwork.Regtest
                 };
-
-                if (network == LiquidNetwork.Mainnet && _settings.Network != LightningPaymentsSettings.LightningNetwork.Mainnet)
-                {
-                    _logger.LogWarning("Invalid network setting '{Network}', defaulting to Mainnet.", _settings.Network);
-                }
 
                 var config = _wrapper.DefaultConfig(network, _settings.BreezApiKey) with { workingDir = workingDir };
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
