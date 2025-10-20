@@ -252,8 +252,34 @@ namespace Tollervey.LightningPayments.Breez.Services
                             using var scope = _serviceProvider.CreateScope();
                             var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
                             var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
-                            dynamic succeededDynamic = succeeded;
-                            string paymentHash = succeededDynamic.details.paymentHash;
+
+                            string? paymentHash = null;
+                            try
+                            {
+                                var detailsProp = succeeded.GetType().GetProperty("details");
+                                if (detailsProp != null)
+                                {
+                                    var details = detailsProp.GetValue(succeeded);
+                                    if (details != null)
+                                    {
+                                        var hashProp = details.GetType().GetProperty("paymentHash");
+                                        if (hashProp != null)
+                                        {
+                                            paymentHash = hashProp.GetValue(details) as string;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Failed to extract paymentHash using reflection from SDK event.");
+                            }
+
+                            if (string.IsNullOrEmpty(paymentHash))
+                            {
+                                _logger.LogWarning("Unable to extract paymentHash from PaymentSucceeded event.");
+                                return;
+                            }
 
                             if (!deduper.TryBegin(paymentHash))
                             {
