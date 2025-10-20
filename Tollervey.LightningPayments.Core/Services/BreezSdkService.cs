@@ -1,4 +1,5 @@
-﻿using Breez.Sdk.Liquid;
+﻿using System.Threading;
+using Breez.Sdk.Liquid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,7 +9,7 @@ using Tollervey.LightningPayments.Breez.Models;
 
 namespace Tollervey.LightningPayments.Breez.Services
 {
-    public class BreezSdkService : IBreezSdkService
+    public class BreezSdkService : IBreezSdkService, IAsyncDisposable
     {
         private readonly ILogger<BreezSdkService> _logger;
         private readonly IHostEnvironment _hostEnvironment;
@@ -17,6 +18,8 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly IBreezSdkWrapper _wrapper;
         private readonly Lazy<Task<BindingLiquidSdk?>> _sdkInstance;
         private static readonly SemaphoreSlim _initSemaphore = new(1, 1);
+        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private int _disposed = 0;
 
         public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, IServiceProvider serviceProvider, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper)
         {
@@ -65,7 +68,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
 
                 var sdk = await Task.Run(() => _wrapper.Connect(connectRequest));
-                _wrapper.AddEventListener(sdk, new SdkEventListener(_serviceProvider));
+                _wrapper.AddEventListener(sdk, new SdkEventListener(_serviceProvider, _cts.Token));
                 _logger.LogInformation("Breez SDK connected successfully.");
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
@@ -139,6 +142,11 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         public async ValueTask DisposeAsync()
         {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
             if (_sdkInstance.IsValueCreated)
             {
                 var sdk = await _sdkInstance.Value;
@@ -155,6 +163,9 @@ namespace Tollervey.LightningPayments.Breez.Services
                     _logger.LogError(ex, "Error disconnecting from Breez SDK.");
                 }
             }
+
+            _cts.Cancel();
+            _cts.Dispose();
         }
 
         internal class SdkLogger : Logger
@@ -168,10 +179,12 @@ namespace Tollervey.LightningPayments.Breez.Services
         {
             private readonly ILogger<BreezSdkService> _logger;
             private readonly IServiceProvider _serviceProvider;
+            private readonly CancellationToken _token;
 
-            public SdkEventListener(IServiceProvider serviceProvider)
+            public SdkEventListener(IServiceProvider serviceProvider, CancellationToken token)
             {
                 _serviceProvider = serviceProvider;
+                _token = token;
                 _logger = serviceProvider.GetRequiredService<ILogger<BreezSdkService>>();
             }
 
@@ -196,7 +209,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                         {
                             _logger.LogError(ex, "Failed to confirm payment from SDK event.");
                         }
-                    });
+                    }, _token);
                 }
             }
         }
