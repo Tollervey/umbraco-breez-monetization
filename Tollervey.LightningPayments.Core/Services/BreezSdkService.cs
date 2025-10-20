@@ -21,7 +21,7 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly IBreezSdkWrapper _wrapper;
         private readonly Lazy<Task<BindingLiquidSdk?>> _sdkInstance;
-        private static readonly SemaphoreSlim _initSemaphore = new(1, 1);
+        private readonly SemaphoreSlim _initSemaphore = new SemaphoreSlim(1, 1);
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private int _disposed = 0;
 
