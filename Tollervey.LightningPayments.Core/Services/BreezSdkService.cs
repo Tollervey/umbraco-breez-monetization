@@ -144,6 +144,12 @@ namespace Tollervey.LightningPayments.Breez.Services
             }
         }
 
+        public async Task<bool> IsConnectedAsync(CancellationToken ct = default)
+        {
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
+            return sdk != null;
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0)

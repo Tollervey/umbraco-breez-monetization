@@ -8,6 +8,7 @@ using Tollervey.Umbraco.LightningPayments.Core.Middleware;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Tollervey.Umbraco.LightningPayments.Core.Composers
 {
@@ -47,6 +48,8 @@ namespace Tollervey.Umbraco.LightningPayments.Core.Composers
             builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
             builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
 
+            builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
+
             // Register middleware
             builder.Services.AddTransient<ExceptionHandlingMiddleware>();
             builder.Services.AddTransient<PaywallMiddleware>();
@@ -59,6 +62,10 @@ namespace Tollervey.Umbraco.LightningPayments.Core.Composers
                 options.AddFilter(new UmbracoPipelineFilter(nameof(PaywallMiddleware))
                 {
                     PostRouting = app => app.UseMiddleware<PaywallMiddleware>()
+                });
+                options.AddFilter(new UmbracoPipelineFilter("HealthChecks")
+                {
+                    PostRouting = app => app.UseEndpoints(endpoints => endpoints.MapHealthChecks("/health/ready"))
                 });
             });
         }
