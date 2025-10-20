@@ -222,7 +222,23 @@ namespace Tollervey.LightningPayments.Breez.Services
         {
             private readonly ILogger<BreezSdkService> _logger;
             public SdkLogger(ILogger<BreezSdkService> logger) => _logger = logger;
-            public void Log(LogEntry l) => _logger.LogInformation("BreezSDK: [{level}]: {line}", l.level, l.line);
+
+            public void Log(LogEntry l)
+            {
+                var logLevel = l.level switch
+                {
+                    "TRACE" => LogLevel.Trace,
+                    "DEBUG" => LogLevel.Debug,
+                    "INFO" => LogLevel.Information,
+                    "WARN" => LogLevel.Warning,
+                    "ERROR" => LogLevel.Error,
+                    "CRITICAL" => LogLevel.Critical,
+                    _ => LogLevel.Information
+                };
+
+                _logger.Log(logLevel, "BreezSDK: [{level}]: {line}", l.level, l.line);
+            }
+
         }
 
         internal class SdkEventListener : EventListener
