@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Tollervey.LightningPayments.Breez.Configuration;
 using Tollervey.LightningPayments.Breez.Services;
 using Tollervey.Umbraco.LightningPayments.Core.Middleware;
@@ -20,7 +21,10 @@ namespace Tollervey.Umbraco.LightningPayments.Core.Composers
             // Bind the "LightningPayments" section of appsettings to the settings model
             builder.Services.AddOptions<LightningPaymentsSettings>()
                 .Bind(builder.Config.GetSection(LightningPaymentsSettings.SectionName))
-                .ValidateDataAnnotations();
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            builder.Services.AddSingleton<IValidateOptions<LightningPaymentsSettings>, LightningPaymentsSettingsValidator>();
 
             // Add Application Insights if connection string is provided
             var aiConnectionString = builder.Config.GetSection(LightningPaymentsSettings.SectionName)["ApplicationInsightsConnectionString"];
