@@ -18,7 +18,6 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly ILogger<BreezSdkService> _logger;
         private readonly IHostEnvironment _hostEnvironment;
         private readonly LightningPaymentsSettings _settings;
-        private readonly IServiceProvider _serviceProvider;
         private readonly IBreezSdkWrapper _wrapper;
         private readonly Lazy<Task<BindingLiquidSdk?>> _sdkInstance;
         private readonly SemaphoreSlim _initSemaphore = new SemaphoreSlim(1, 1);
@@ -30,13 +29,17 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly IAsyncPolicy<PrepareReceiveResponse> _preparePolicy;
         private readonly IAsyncPolicy<ReceivePaymentResponse> _receivePolicy;
 
-        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, IServiceProvider serviceProvider, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper)
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly IServiceScopeFactory _scopeFactory;
+
+        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper)
         {
             _settings = settings.Value;
             _logger = logger;
             _hostEnvironment = hostEnvironment;
-            _serviceProvider = serviceProvider;
             _wrapper = wrapper;
+            _loggerFactory = loggerFactory;
+            _scopeFactory = scopeFactory;
             _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(() => InitializeSdkAsync(), LazyThreadSafetyMode.ExecutionAndPublication);
 
             // Initialize resiliency policies
@@ -100,7 +103,7 @@ namespace Tollervey.LightningPayments.Breez.Services
 
                 ct.ThrowIfCancellationRequested();
                 var sdk = await _connectPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.Connect(connectRequest), token), ct);
-                _wrapper.AddEventListener(sdk, new SdkEventListener(_serviceProvider, _cts.Token));
+                _wrapper.AddEventListener(sdk, new SdkEventListener(_scopeFactory, _loggerFactory.CreateLogger<SdkEventListener>(), _cts.Token));
                 _logger.LogInformation("Breez SDK connected successfully.");
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
@@ -243,15 +246,15 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         internal class SdkEventListener : EventListener
         {
-            private readonly ILogger<BreezSdkService> _logger;
-            private readonly IServiceProvider _serviceProvider;
+            private readonly ILogger<SdkEventListener> _logger;
+            private readonly IServiceScopeFactory _scopeFactory;
             private readonly CancellationToken _token;
 
-            public SdkEventListener(IServiceProvider serviceProvider, CancellationToken token)
+            public SdkEventListener(IServiceScopeFactory scopeFactory, ILogger<SdkEventListener> logger, CancellationToken token)
             {
-                _serviceProvider = serviceProvider;
+                _scopeFactory = scopeFactory;
+                _logger = logger;
                 _token = token;
-                _logger = serviceProvider.GetRequiredService<ILogger<BreezSdkService>>();
             }
 
             public void OnEvent(SdkEvent e)
@@ -265,7 +268,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                         try
                         {
                             _token.ThrowIfCancellationRequested();
-                            using var scope = _serviceProvider.CreateScope();
+                            using var scope = _scopeFactory.CreateScope();
                             var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
                             var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
 
