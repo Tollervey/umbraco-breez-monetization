@@ -28,14 +28,17 @@ namespace Tollervey.LightningPayments.Breez.Services
             _hostEnvironment = hostEnvironment;
             _serviceProvider = serviceProvider;
             _wrapper = wrapper;
-            _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(InitializeSdkAsync, LazyThreadSafetyMode.ExecutionAndPublication);
+            _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(() => InitializeSdkAsync(), LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
-        private async Task<BindingLiquidSdk?> InitializeSdkAsync()
+        private async Task<BindingLiquidSdk?> InitializeSdkAsync(CancellationToken ct = default)
         {
-            await _initSemaphore.WaitAsync();
+            bool acquired = false;
             try
             {
+                await _initSemaphore.WaitAsync(ct);
+                acquired = true;
+
                 if (string.IsNullOrWhiteSpace(_settings.BreezApiKey) || string.IsNullOrWhiteSpace(_settings.Mnemonic))
                 {
                     _logger.LogWarning("Breez SDK credentials are not configured. Service will not start.");
@@ -67,12 +70,14 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var config = _wrapper.DefaultConfig(network, _settings.BreezApiKey) with { workingDir = workingDir };
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
 
+                ct.ThrowIfCancellationRequested();
                 var sdk = await Task.Run(() => _wrapper.Connect(connectRequest));
                 _wrapper.AddEventListener(sdk, new SdkEventListener(_serviceProvider, _cts.Token));
                 _logger.LogInformation("Breez SDK connected successfully.");
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
                 {
+                    ct.ThrowIfCancellationRequested();
                     await Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl));
                     _logger.LogInformation("Breez SDK webhook registered for URL: {WebhookUrl}", _settings.WebhookUrl);
                 }
@@ -86,13 +91,16 @@ namespace Tollervey.LightningPayments.Breez.Services
             }
             finally
             {
-                _initSemaphore.Release();
+                if (acquired)
+                {
+                    _initSemaphore.Release();
+                }
             }
         }
 
-        public async Task<string> CreateInvoiceAsync(ulong amountSat, string description)
+        public async Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
-            var sdk = await _sdkInstance.Value;
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
             if (sdk == null)
             {
                 throw new InvalidOperationException("Breez SDK is not connected.");
@@ -102,10 +110,14 @@ namespace Tollervey.LightningPayments.Breez.Services
             {
                 var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt11Invoice, optionalAmount);
+
+                ct.ThrowIfCancellationRequested();
                 var prepareResponse = await Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest));
                 _logger.LogInformation("Breez SDK invoice creation fee: {FeeSat} sats", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
+
+                ct.ThrowIfCancellationRequested();
                 var res = await Task.Run(() => _wrapper.ReceivePayment(sdk, req));
                 return res.destination;
             }
@@ -115,9 +127,9 @@ namespace Tollervey.LightningPayments.Breez.Services
             }
         }
 
-        public async Task<string> CreateBolt12OfferAsync(ulong amountSat, string description)
+        public async Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
-            var sdk = await _sdkInstance.Value;
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
             if (sdk == null)
             {
                 throw new InvalidOperationException("Breez SDK is not connected.");
@@ -127,10 +139,14 @@ namespace Tollervey.LightningPayments.Breez.Services
             {
                 var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt12Offer, optionalAmount);
+
+                ct.ThrowIfCancellationRequested();
                 var prepareResponse = await Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest));
                 _logger.LogInformation("Breez SDK offer creation fee: {FeeSat} sats", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
+
+                ct.ThrowIfCancellationRequested();
                 var res = await Task.Run(() => _wrapper.ReceivePayment(sdk, req));
                 return res.destination;
             }
@@ -198,10 +214,13 @@ namespace Tollervey.LightningPayments.Breez.Services
                     {
                         try
                         {
+                            _token.ThrowIfCancellationRequested();
                             using var scope = _serviceProvider.CreateScope();
                             var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
                             dynamic succeededDynamic = succeeded;
                             string paymentHash = succeededDynamic.details.paymentHash;
+
+                            _token.ThrowIfCancellationRequested();
                             await paymentService.ConfirmPaymentAsync(paymentHash);
                             _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
                         }
