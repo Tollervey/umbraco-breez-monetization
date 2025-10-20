@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tollervey.LightningPayments.Breez.Configuration;
 using Tollervey.LightningPayments.Breez.Models;
+
 namespace Tollervey.LightningPayments.Breez.Services
 {
     public class BreezSdkService : IBreezSdkService
@@ -13,15 +14,17 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly IHostEnvironment _hostEnvironment;
         private readonly LightningPaymentsSettings _settings;
         private readonly IServiceProvider _serviceProvider;
+        private readonly IBreezSdkWrapper _wrapper;
         private readonly Lazy<Task<BindingLiquidSdk?>> _sdkInstance;
         private static readonly SemaphoreSlim _initSemaphore = new(1, 1);
 
-        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, IServiceProvider serviceProvider, ILogger<BreezSdkService> logger)
+        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, IServiceProvider serviceProvider, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper)
         {
             _settings = settings.Value;
             _logger = logger;
             _hostEnvironment = hostEnvironment;
             _serviceProvider = serviceProvider;
+            _wrapper = wrapper;
             _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(InitializeSdkAsync, LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
@@ -37,7 +40,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                 }
 
                 _logger.LogInformation("Initializing Breez SDK...");
-                BreezSdkLiquidMethods.SetLogger(new SdkLogger(_logger));
+                _wrapper.SetLogger(new SdkLogger(_logger));
 
                 var workingDir = Path.Combine(_hostEnvironment.ContentRootPath, $"App_Data/{LightningPaymentsSettings.SectionName}/");
                 if (!Directory.Exists(workingDir))
@@ -58,16 +61,16 @@ namespace Tollervey.LightningPayments.Breez.Services
                     _logger.LogWarning("Invalid network setting '{Network}', defaulting to Mainnet.", _settings.Network);
                 }
 
-                var config = BreezSdkLiquidMethods.DefaultConfig(network, _settings.BreezApiKey) with { workingDir = workingDir };
+                var config = _wrapper.DefaultConfig(network, _settings.BreezApiKey) with { workingDir = workingDir };
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
 
-                var sdk = await Task.Run(() => BreezSdkLiquidMethods.Connect(connectRequest));
-                sdk.AddEventListener(new SdkEventListener(_serviceProvider));
+                var sdk = await Task.Run(() => _wrapper.Connect(connectRequest));
+                _wrapper.AddEventListener(sdk, new SdkEventListener(_serviceProvider));
                 _logger.LogInformation("Breez SDK connected successfully.");
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
                 {
-                    await Task.Run(() => sdk.RegisterWebhook(_settings.WebhookUrl));
+                    await Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl));
                     _logger.LogInformation("Breez SDK webhook registered for URL: {WebhookUrl}", _settings.WebhookUrl);
                 }
 
@@ -96,11 +99,11 @@ namespace Tollervey.LightningPayments.Breez.Services
             {
                 var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt11Invoice, optionalAmount);
-                var prepareResponse = await Task.Run(() => sdk.PrepareReceivePayment(prepareRequest));
+                var prepareResponse = await Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest));
                 _logger.LogInformation("Breez SDK invoice creation fee: {FeeSat} sats", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
-                var res = await Task.Run(() => sdk.ReceivePayment(req));
+                var res = await Task.Run(() => _wrapper.ReceivePayment(sdk, req));
                 return res.destination;
             }
             catch (Exception ex)
@@ -121,11 +124,11 @@ namespace Tollervey.LightningPayments.Breez.Services
             {
                 var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt12Offer, optionalAmount);
-                var prepareResponse = await Task.Run(() => sdk.PrepareReceivePayment(prepareRequest));
+                var prepareResponse = await Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest));
                 _logger.LogInformation("Breez SDK offer creation fee: {FeeSat} sats", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
-                var res = await Task.Run(() => sdk.ReceivePayment(req));
+                var res = await Task.Run(() => _wrapper.ReceivePayment(sdk, req));
                 return res.destination;
             }
             catch (Exception ex)
@@ -141,7 +144,10 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var sdk = await _sdkInstance.Value;
                 try
                 {
-                    sdk?.Disconnect();
+                    if (sdk != null)
+                    {
+                        _wrapper.Disconnect(sdk);
+                    }
                     _logger.LogInformation("Breez SDK disconnected.");
                 }
                 catch (Exception ex)
@@ -151,14 +157,14 @@ namespace Tollervey.LightningPayments.Breez.Services
             }
         }
 
-        private class SdkLogger : Logger
+        internal class SdkLogger : Logger
         {
             private readonly ILogger<BreezSdkService> _logger;
             public SdkLogger(ILogger<BreezSdkService> logger) => _logger = logger;
             public void Log(LogEntry l) => _logger.LogInformation("BreezSDK: [{level}]: {line}", l.level, l.line);
         }
 
-        private class SdkEventListener : EventListener
+        internal class SdkEventListener : EventListener
         {
             private readonly ILogger<BreezSdkService> _logger;
             private readonly IServiceProvider _serviceProvider;

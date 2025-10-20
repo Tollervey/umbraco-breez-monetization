@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="Tollervey.LightningPayments.Core/Tollervey.LightningPayments.Breez.csproj" />
   <Project Path="Tollervey.Umbraco.LightningPayments.Core/Tollervey.Umbraco.LightningPayments.Core.csproj" />
-  <Project Path="Tollervey.Umbraco.LightningPayments.Tests/Tollervey.Umbraco.LightningPayments.Tests.csproj" />
+  <Project Path="Tollervey.Umbraco.LightningPayments.CoreTests/Tollervey.Umbraco.LightningPayments.CoreTests.csproj" Id="2390572b-245d-483c-b7f8-f6a5e3002397" />
+  <Project Path="Tollervey.Umbraco.LightningPayments.Tests/Tollervey.LightningPayments.BreezTests.csproj" />
   <Project Path="Tollervey.Umbraco.LightningPayments/Tollervey.Umbraco.LightningPayments.UI.csproj" />
 </Solution>
