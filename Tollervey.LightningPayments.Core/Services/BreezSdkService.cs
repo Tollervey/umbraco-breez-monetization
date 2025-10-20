@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using Breez.Sdk.Liquid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -6,6 +7,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tollervey.LightningPayments.Breez.Configuration;
 using Tollervey.LightningPayments.Breez.Models;
+using Polly;
+using System.Net.Http;
+using System.Net.Sockets;
 
 namespace Tollervey.LightningPayments.Breez.Services
 {
@@ -21,6 +25,11 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private int _disposed = 0;
 
+        private readonly IAsyncPolicy<BindingLiquidSdk> _connectPolicy;
+        private readonly IAsyncPolicy _webhookPolicy;
+        private readonly IAsyncPolicy<PrepareReceiveResponse> _preparePolicy;
+        private readonly IAsyncPolicy<ReceivePaymentResponse> _receivePolicy;
+
         public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, IServiceProvider serviceProvider, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper)
         {
             _settings = settings.Value;
@@ -29,6 +38,37 @@ namespace Tollervey.LightningPayments.Breez.Services
             _serviceProvider = serviceProvider;
             _wrapper = wrapper;
             _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(() => InitializeSdkAsync(), LazyThreadSafetyMode.ExecutionAndPublication);
+
+            // Initialize resiliency policies
+            var retryDelay = (int attempt) => TimeSpan.FromSeconds(Math.Pow(2, attempt)) + TimeSpan.FromMilliseconds(Random.Shared.Next(0, 1000));
+
+            // Connect policy
+            var connectTimeout = Policy.TimeoutAsync<BindingLiquidSdk>(TimeSpan.FromSeconds(30));
+            var connectRetry = Policy<BindingLiquidSdk>.Handle<Exception>()
+                .WaitAndRetryAsync(3, retryDelay,
+                onRetryAsync: (outcome, ts, attempt, ctx) => { _logger.LogWarning("Retry {Attempt} for connect after {TimeSpan.TotalSeconds}s due to {Message}", attempt, ts, outcome.Exception?.Message ?? "unknown error"); return Task.CompletedTask; });
+            _connectPolicy = connectRetry.WrapAsync(connectTimeout);
+
+            // Webhook policy
+            var webhookTimeout = Policy.TimeoutAsync(TimeSpan.FromSeconds(30));
+            var webhookRetry = Policy.Handle<Exception>()
+                .WaitAndRetryAsync(3, retryDelay,
+                onRetryAsync: (ex, ts, attempt, ctx) => { _logger.LogWarning("Retry {Attempt} for webhook registration after {TimeSpan.TotalSeconds}s due to {Message}", attempt, ts, ex.Message); return Task.CompletedTask; });
+            _webhookPolicy = webhookRetry.WrapAsync(webhookTimeout);
+
+            // Prepare policy (conservative)
+            var prepareTimeout = Policy.TimeoutAsync<PrepareReceiveResponse>(TimeSpan.FromSeconds(10));
+            var prepareRetry = Policy<PrepareReceiveResponse>.Handle<TimeoutException>().Or<HttpRequestException>().Or<SocketException>()
+                .WaitAndRetryAsync(1, _ => TimeSpan.FromSeconds(2),
+                onRetryAsync: (outcome, ts, attempt, ctx) => { _logger.LogWarning("Retry {Attempt} for prepare receive after {TimeSpan.TotalSeconds}s due to {Message}", attempt, ts, outcome.Exception?.Message ?? "unknown error"); return Task.CompletedTask; });
+            _preparePolicy = prepareRetry.WrapAsync(prepareTimeout);
+
+            // Receive policy (conservative)
+            var receiveTimeout = Policy.TimeoutAsync<ReceivePaymentResponse>(TimeSpan.FromSeconds(10));
+            var receiveRetry = Policy<ReceivePaymentResponse>.Handle<TimeoutException>().Or<HttpRequestException>().Or<SocketException>()
+                .WaitAndRetryAsync(1, _ => TimeSpan.FromSeconds(2),
+                onRetryAsync: (outcome, ts, attempt, ctx) => { _logger.LogWarning("Retry {Attempt} for receive payment after {TimeSpan.TotalSeconds}s due to {Message}", attempt, ts, outcome.Exception?.Message ?? "unknown error"); return Task.CompletedTask; });
+            _receivePolicy = receiveRetry.WrapAsync(receiveTimeout);
         }
 
         private async Task<BindingLiquidSdk?> InitializeSdkAsync(CancellationToken ct = default)
@@ -59,14 +99,14 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
 
                 ct.ThrowIfCancellationRequested();
-                var sdk = await Task.Run(() => _wrapper.Connect(connectRequest));
+                var sdk = await _connectPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.Connect(connectRequest), token), ct);
                 _wrapper.AddEventListener(sdk, new SdkEventListener(_serviceProvider, _cts.Token));
                 _logger.LogInformation("Breez SDK connected successfully.");
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
                 {
                     ct.ThrowIfCancellationRequested();
-                    await Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl));
+                    await _webhookPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl), token), ct);
                     _logger.LogInformation("Breez SDK webhook registered for URL: {WebhookUrl}", _settings.WebhookUrl);
                 }
 
@@ -100,13 +140,13 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt11Invoice, optionalAmount);
 
                 ct.ThrowIfCancellationRequested();
-                var prepareResponse = await Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest));
+                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest), token), ct);
                 _logger.LogInformation("Breez SDK invoice creation fee: {FeeSat} sats", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
 
                 ct.ThrowIfCancellationRequested();
-                var res = await Task.Run(() => _wrapper.ReceivePayment(sdk, req));
+                var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
                 return res.destination;
             }
             catch (Exception ex)
@@ -129,13 +169,13 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt12Offer, optionalAmount);
 
                 ct.ThrowIfCancellationRequested();
-                var prepareResponse = await Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest));
+                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest), token), ct);
                 _logger.LogInformation("Breez SDK offer creation fee: {FeeSat} sats", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
 
                 ct.ThrowIfCancellationRequested();
-                var res = await Task.Run(() => _wrapper.ReceivePayment(sdk, req));
+                var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
                 return res.destination;
             }
             catch (Exception ex)
