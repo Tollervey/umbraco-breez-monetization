@@ -76,7 +76,7 @@ public class BreezSdkServiceTests
 
         // Use reflection to call private method
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
+        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
         var result = await task;
 
         Assert.IsNull(result);
@@ -94,7 +94,7 @@ public class BreezSdkServiceTests
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
+        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
         var result = await task;
 
         Assert.IsNotNull(result);
@@ -137,7 +137,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         var result = await service.CreateInvoiceAsync(1000, "test description");
 
@@ -157,7 +157,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         await service.CreateInvoiceAsync(1000, "test");
     }
@@ -179,7 +179,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         var result = await service.CreateBolt12OfferAsync(1000, "test description");
 
@@ -235,11 +235,98 @@ public class BreezSdkServiceTests
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
+        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
         await task;
 
         _wrapperMock.Verify(w => w.RegisterWebhook(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>()), Times.Never);
     }
+
+    [TestMethod]
+    public async Task InitializeSdkAsync_WithInvalidWebhookUrl_DoesNotRegisterWebhook()
+    {
+        // Arrange
+        _settings = new LightningPaymentsSettings
+        {
+            BreezApiKey = "test-api-key",
+            Mnemonic = "test-mnemonic",
+            Network = LightningPaymentsSettings.LightningNetwork.Testnet,
+            WebhookUrl = "not-a-valid-url"
+        };
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+
+        var sdkMock = new Mock<BindingLiquidSdk>();
+        SetupSdkInitialization(sdkMock.Object);
+
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act
+        var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        await (Task)method.Invoke(service, new object[] { CancellationToken.None });
+
+        // Assert
+        _wrapperMock.Verify(w => w.RegisterWebhook(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>()), Times.Never);
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("is not a valid URI")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.Once);
+    }
+
+    [TestMethod]
+    public async Task InitializeSdkAsync_WithHttpWebhookUrl_DoesNotRegisterWebhook()
+    {
+        // Arrange
+        _settings = new LightningPaymentsSettings
+        {
+            BreezApiKey = "test-api-key",
+            Mnemonic = "test-mnemonic",
+            Network = LightningPaymentsSettings.LightningNetwork.Testnet,
+            WebhookUrl = "http://insecure-webhook.com"
+        };
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+
+        var sdkMock = new Mock<BindingLiquidSdk>();
+        SetupSdkInitialization(sdkMock.Object);
+
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act
+        var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        await (Task)method.Invoke(service, new object[] { CancellationToken.None });
+
+        // Assert
+        _wrapperMock.Verify(w => w.RegisterWebhook(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>()), Times.Never);
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("must use https scheme")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.Once);
+    }
+
+    [TestMethod]
+    public async Task InitializeSdkAsync_RegistersWebhookOnlyOnce()
+    {
+        // Arrange
+        var sdkMock = new Mock<BindingLiquidSdk>();
+        SetupSdkInitialization(sdkMock.Object);
+
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Act
+        await (Task)method.Invoke(service, new object[] { CancellationToken.None });
+        await (Task)method.Invoke(service, new object[] { CancellationToken.None }); // Call a second time
+
+        // Assert
+        _wrapperMock.Verify(w => w.RegisterWebhook(sdkMock.Object, _settings.WebhookUrl), Times.Once);
+    }
+
 
     [TestMethod]
     [ExpectedException(typeof(InvoiceException))]
@@ -254,7 +341,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         await service.CreateBolt12OfferAsync(1000, "test");
     }
@@ -295,7 +382,7 @@ public class BreezSdkServiceTests
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
+        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
         var result = await task;
 
         Assert.IsNotNull(result);
@@ -322,6 +409,13 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
+        var payerAmount = new ReceiveAmount.Bitcoin(1000);
+        var prepareResponse = new PrepareReceiveResponse(PaymentMethod.Bolt11Invoice, 100, payerAmount, 1000, 10000, 0.1);
+        _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Returns(prepareResponse);
+
+        var receiveResponse = new ReceivePaymentResponse("bolt11-invoice", null, null);
+        _wrapperMock.Setup(w => w.ReceivePayment(sdkMock.Object, It.IsAny<ReceivePaymentRequest>())).Returns(receiveResponse);
+
         var paymentStateServiceMock = new Mock<IPaymentStateService>();
         paymentStateServiceMock.Setup(p => p.ConfirmPaymentAsync(It.IsAny<string>())).Returns(Task.FromResult(PaymentConfirmationResult.Confirmed));
 
@@ -338,7 +432,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization to set up the listener
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         // Simulate event by invoking the listener's OnEvent method
         var listenerField = typeof(BreezSdkService).GetField("SdkEventListener", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.FlattenHierarchy);
@@ -403,7 +497,7 @@ public class BreezSdkServiceTests
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)method.Invoke(service, null);
+        await (Task)method.Invoke(service, new object[] { CancellationToken.None });
 
         _loggerMock.Verify(l => l.LogInformation("Initializing Breez SDK..."), Times.Once);
         // Can't directly test Directory.CreateDirectory, but coverage is hit if init is called
@@ -437,7 +531,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         // Find listener type
         var nestedTypes = typeof(BreezSdkService).GetNestedTypes(BindingFlags.NonPublic);
@@ -491,11 +585,11 @@ public class BreezSdkServiceTests
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
+        var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
         var result = await task;
 
         Assert.IsNotNull(result); // Continues despite failure
-        _loggerMock.Verify(l => l.LogError(It.IsAny<Exception>(), It.IsAny<string>()), Times.AtLeastOnce); // Logs the error
+        _loggerMock.Verify(l => l.LogWarning(It.IsAny<string>(), It.IsAny<object[]>()), Times.AtLeastOnce);
     }
 
     [TestMethod]
@@ -506,11 +600,10 @@ public class BreezSdkServiceTests
         SetupSdkInitialization(sdkMock.Object);
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
-
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
         // Act
-        var tasks = Enumerable.Range(0, 5).Select(i => (Task<BindingLiquidSdk?>)method.Invoke(service, null)).ToArray();
+        var tasks = Enumerable.Range(0, 5).Select(i => (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None })).ToArray();
         await Task.WhenAll(tasks);
 
         // Assert
@@ -544,7 +637,7 @@ public class BreezSdkServiceTests
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        await (Task)initMethod.Invoke(service, null);
+        await (Task)initMethod.Invoke(service, new object[] { CancellationToken.None });
 
         // Find listener type
         var nestedTypes = typeof(BreezSdkService).GetNestedTypes(BindingFlags.NonPublic);
@@ -584,7 +677,7 @@ public class BreezSdkServiceTests
 
     private void SetupSdkInitialization(BindingLiquidSdk sdk)
     {
-        var config = BreezSdkLiquidMethods.DefaultConfig(LiquidNetwork.Testnet, "test-api-key");
+        var config = new Config(new BlockchainExplorer(), new BlockchainExplorer(), "test-path", LiquidNetwork.Testnet, 3600UL, null, null, null, false, false, null, null, null, null);
         _wrapperMock.Setup(w => w.DefaultConfig(LiquidNetwork.Testnet, "test-api-key")).Returns(config);
         _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdk);
     }

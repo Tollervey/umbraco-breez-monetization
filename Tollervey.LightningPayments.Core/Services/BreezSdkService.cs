@@ -23,6 +23,7 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly SemaphoreSlim _initSemaphore = new SemaphoreSlim(1, 1);
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private int _disposed = 0;
+        private bool _webhookRegistered = false;
 
         private readonly IAsyncPolicy<BindingLiquidSdk> _connectPolicy;
         private readonly IAsyncPolicy _webhookPolicy;
@@ -108,9 +109,18 @@ namespace Tollervey.LightningPayments.Breez.Services
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
                 {
-                    ct.ThrowIfCancellationRequested();
-                    await _webhookPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl), token), ct);
-                    _logger.LogInformation("Breez SDK webhook registered for URL: {WebhookUrl}", _settings.WebhookUrl);
+                    if (ValidateWebhookUrl(_settings.WebhookUrl) && !_webhookRegistered)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        // TODO: Implement challenge/verification on the receiver side to confirm the endpoint is valid.
+                        await _webhookPolicy.ExecuteAsync(async (token) =>
+                        {
+                            await Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl), token);
+                            _webhookRegistered = true;
+                        }, ct);
+                        // TODO: The webhook receiver should validate incoming requests using HMAC signatures.
+                        _logger.LogInformation("Breez SDK webhook registered for URL: {WebhookUrl}", _settings.WebhookUrl);
+                    }
                 }
 
                 return sdk;
@@ -219,6 +229,26 @@ namespace Tollervey.LightningPayments.Breez.Services
 
             _cts.Cancel();
             _cts.Dispose();
+        }
+
+        private bool ValidateWebhookUrl(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                _logger.LogWarning("Webhook URL '{WebhookUrl}' is not a valid URI.", url);
+                return false;
+            }
+
+            if (uri.Scheme != "https")
+            {
+                _logger.LogWarning("Webhook URL '{WebhookUrl}' must use https scheme.", url);
+                return false;
+            }
+
+            // Optional: Add hostname validation here if you want to restrict to a specific domain.
+            // For example: if(uri.Host != "your-expected-host.com") { ... }
+
+            return true;
         }
 
         internal class SdkLogger : Logger
