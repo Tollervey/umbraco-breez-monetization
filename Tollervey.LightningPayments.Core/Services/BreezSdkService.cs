@@ -37,8 +37,9 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         private readonly ILoggerFactory _loggerFactory;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly IBreezEventProcessor _breezEventProcessor;
 
-        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper)
+        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper, IBreezEventProcessor breezEventProcessor)
         {
             _settings = settings.Value;
             _logger = logger;
@@ -46,6 +47,7 @@ namespace Tollervey.LightningPayments.Breez.Services
             _wrapper = wrapper;
             _loggerFactory = loggerFactory;
             _scopeFactory = scopeFactory;
+            _breezEventProcessor = breezEventProcessor;
             _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(() => InitializeSdkAsync(), LazyThreadSafetyMode.ExecutionAndPublication);
 
             // Initialize resiliency policies
@@ -111,7 +113,7 @@ namespace Tollervey.LightningPayments.Breez.Services
 
                 ct.ThrowIfCancellationRequested();
                 var sdk = await _connectPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.Connect(connectRequest), token), ct);
-                _eventListener = new SdkEventListener(_scopeFactory, _loggerFactory.CreateLogger<SdkEventListener>(), () => _disposed == 1);
+                _eventListener = new SdkEventListener(_breezEventProcessor, _loggerFactory.CreateLogger<SdkEventListener>(), () => _disposed == 1);
                 _wrapper.AddEventListener(sdk, _eventListener);
                 _logger.LogInformation("Breez SDK connected successfully.");
 
@@ -354,12 +356,12 @@ namespace Tollervey.LightningPayments.Breez.Services
         internal class SdkEventListener : EventListener
         {
             private readonly ILogger<SdkEventListener> _logger;
-            private readonly IServiceScopeFactory _scopeFactory;
+            private readonly IBreezEventProcessor _breezEventProcessor;
             private readonly Func<bool> _isDisposed;
 
-            public SdkEventListener(IServiceScopeFactory scopeFactory, ILogger<SdkEventListener> logger, Func<bool> isDisposed)
+            public SdkEventListener(IBreezEventProcessor breezEventProcessor, ILogger<SdkEventListener> logger, Func<bool> isDisposed)
             {
-                _scopeFactory = scopeFactory;
+                _breezEventProcessor = breezEventProcessor;
                 _logger = logger;
                 _isDisposed = isDisposed;
             }
@@ -376,65 +378,7 @@ namespace Tollervey.LightningPayments.Breez.Services
 
                 if (e is SdkEvent.PaymentSucceeded succeeded)
                 {
-                    _ = Task.Run(async () =>
-                    {
-                        using var activity = _activity.StartActivity("OnPaymentSucceeded");
-                        try
-                        {
-                            if (_isDisposed()) return;
-
-                            using var scope = _scopeFactory.CreateScope();
-                            var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
-                            var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
-
-                            string? paymentHash = null;
-                            try
-                            {
-                                var detailsProp = succeeded.GetType().GetProperty("details");
-                                if (detailsProp != null)
-                                {
-                                    var details = detailsProp.GetValue(succeeded);
-                                    if (details != null)
-                                    {
-                                        var hashProp = details.GetType().GetProperty("paymentHash");
-                                        if (hashProp != null)
-                                        {
-                                            paymentHash = hashProp.GetValue(details) as string;
-                                        }
-                                    }
-                                }
-                                activity?.SetTag("paymentHash", paymentHash);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, "Failed to extract paymentHash using reflection from SDK event.");
-                                activity?.SetStatus(ActivityStatusCode.Error, "Failed to extract paymentHash");
-                            }
-
-                            if (string.IsNullOrEmpty(paymentHash))
-                            {
-                                _logger.LogWarning("Unable to extract paymentHash from PaymentSucceeded event.");
-                                return;
-                            }
-
-                            if (!deduper.TryBegin(paymentHash))
-                            {
-                                _logger.LogInformation("Duplicate payment succeeded event for hash: {PaymentHash}", paymentHash);
-                                return;
-                            }
-
-                            if (_isDisposed()) return;
-                            await paymentService.ConfirmPaymentAsync(paymentHash);
-                            _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
-                            deduper.Complete(paymentHash);
-                            activity?.SetStatus(ActivityStatusCode.Ok);
-                        }
-                        catch (Exception ex)
-                        {
-                            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                            _logger.LogError(ex, "Failed to confirm payment from SDK event.");
-                        }
-                    });
+                    _ = _breezEventProcessor.EnqueueEvent(succeeded);
                 }
             }
         }
