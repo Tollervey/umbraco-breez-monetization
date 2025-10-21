@@ -75,10 +75,18 @@ namespace Tollervey.LightningPayments.Breez.Services
                             var details = detailsProp.GetValue(e);
                             if (details != null)
                             {
-                                var hashProp = details.GetType().GetProperty("paymentHash");
-                                if (hashProp != null)
+                                var paymentDetailsProp = details.GetType().GetProperty("details");
+                                if (paymentDetailsProp != null)
                                 {
-                                    paymentHash = hashProp.GetValue(details) as string;
+                                    var paymentDetails = paymentDetailsProp.GetValue(details);
+                                    if (paymentDetails != null)
+                                    {
+                                        var hashProp = paymentDetails.GetType().GetProperty("paymentHash");
+                                        if (hashProp != null)
+                                        {
+                                            paymentHash = hashProp.GetValue(paymentDetails) as string;
+                                        }
+                                    }
                                 }
                             }
                         }
