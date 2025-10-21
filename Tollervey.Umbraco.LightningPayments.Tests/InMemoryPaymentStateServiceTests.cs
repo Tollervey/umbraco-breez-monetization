@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using Tollervey.LightningPayments.Breez.Models;
-using Tollervey.LightningPayments.Breez.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.Tests;
 

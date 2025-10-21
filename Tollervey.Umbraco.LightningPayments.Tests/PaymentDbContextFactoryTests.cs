@@ -1,5 +1,4 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Tollervey.LightningPayments.Breez.Services;
 using Microsoft.EntityFrameworkCore;
 
 [TestClass]

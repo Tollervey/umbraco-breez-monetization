@@ -2,9 +2,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using Moq;
-using Tollervey.LightningPayments.Breez.Configuration;
-using Tollervey.LightningPayments.Breez.Models;
-using Tollervey.LightningPayments.Breez.Services;
 using Breez.Sdk.Liquid;
 using System.Threading.Tasks;
 using System;
@@ -13,6 +10,10 @@ using System.Reflection;
 using System.Linq;
 using System.Dynamic;
 using System.Text.RegularExpressions;
+using Tollervey.LightningPayments.Breez.Configuration;
+using Tollervey.LightningPayments.Breez.Services;
+using Tollervey.Umbraco.LightningPayments.UI.Models;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.Tests;
 

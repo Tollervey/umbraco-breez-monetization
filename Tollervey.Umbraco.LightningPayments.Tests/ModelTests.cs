@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Tollervey.LightningPayments.Breez.Models;
 
 [TestClass]
 public class ModelTests

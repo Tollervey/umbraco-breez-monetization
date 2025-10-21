@@ -25,7 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Breez.csproj" />
+    <Folder Include="Composers\" />
+    <Folder Include="Controllers\" />
+    <Folder Include="Middleware\" />
+    <Folder Include="Models\" />
   </ItemGroup>
 
 </Project>

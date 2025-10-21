@@ -5,8 +5,6 @@ using Microsoft.Extensions.Options;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
-using Tollervey.LightningPayments.Breez.Configuration;
-using Tollervey.LightningPayments.Breez.Services;
 
 [TestClass]
 public class SmtpEmailServiceTests

@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Tollervey.Umbraco.LightningPayments.Core.Controllers;
+using Tollervey.Umbraco.LightningPayments.UI.Controllers;
 using Umbraco.Cms.Core.Web;
 
 namespace Tollervey.Umbraco.LightningPayments.CoreTests;

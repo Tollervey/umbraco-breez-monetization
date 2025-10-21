@@ -1,7 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
-using Tollervey.LightningPayments.Breez.Models;
-using Tollervey.LightningPayments.Breez.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.Tests
 {

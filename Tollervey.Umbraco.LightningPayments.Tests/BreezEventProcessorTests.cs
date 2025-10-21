@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Reflection;
-using Tollervey.LightningPayments.Breez.Services;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.Tests;
 

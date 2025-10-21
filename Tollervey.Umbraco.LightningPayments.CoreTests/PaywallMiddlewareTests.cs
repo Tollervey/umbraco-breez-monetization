@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Http;
 using Moq;
 using System.Text.Json;
-using Tollervey.LightningPayments.Breez.Models;
-using Tollervey.LightningPayments.Breez.Services;
-using Tollervey.Umbraco.LightningPayments.Core.Middleware;
+using Tollervey.Umbraco.LightningPayments.UI.Middleware;
+using Tollervey.Umbraco.LightningPayments.UI.Models;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Web;

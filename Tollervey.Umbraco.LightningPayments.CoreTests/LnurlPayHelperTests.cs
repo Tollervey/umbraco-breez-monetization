@@ -4,11 +4,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Core.Models.PublishedContent;
-using Tollervey.Umbraco.LightningPayments.Core.Models;
 using Umbraco.Extensions;
-using Tollervey.LightningPayments.Breez.Models;
 
 namespace Tollervey.Umbraco.LightningPayments.CoreTests;
 

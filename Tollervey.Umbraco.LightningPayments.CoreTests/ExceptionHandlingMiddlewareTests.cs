@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Tollervey.Umbraco.LightningPayments.Core.Middleware;
+using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 
 namespace Tollervey.Umbraco.LightningPayments.CoreTests;
 

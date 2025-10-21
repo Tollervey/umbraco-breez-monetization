@@ -19,18 +19,28 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Breez.Sdk.Liquid" Version="0.11.7" />
+    <PackageReference Include="BTCPayServer.Lightning.Common" Version="1.5.2" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics.HealthChecks" Version="2.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.13.1" />
+    <PackageReference Include="Polly" Version="8.6.4" />
     <PackageReference Include="Umbraco.Cms.Web.BackOffice" Version="13.11.0" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="*" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="*" />
     <PackageReference Include="Umbraco.Cms.Api.Common" Version="*" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="*" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Tollervey.LightningPayments.Core\Tollervey.LightningPayments.Breez.csproj" />
-    <ProjectReference Include="..\Tollervey.Umbraco.LightningPayments.Core\Tollervey.Umbraco.LightningPayments.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,12 +52,7 @@
     <Content Include="Client\tsconfig.json" />
 
     <!-- However make the Umbraco-package.json included for dotnet pack or nuget package and visible to the solution -->
-    <None Include="Client\public\umbraco-package.json" Pack="false" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Migrations\" />
-    <Folder Include="Services\" />
+    <Content Include="Client\public\umbraco-package.json" Pack="true" PackagePath="App_Plugins\Tollervey.Umbraco.LightningPayments" />
   </ItemGroup>
 
   <!-- Restore and build Client files -->

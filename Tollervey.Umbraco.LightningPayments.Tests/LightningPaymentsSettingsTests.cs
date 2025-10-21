@@ -1,5 +1,4 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Tollervey.LightningPayments.Breez.Configuration;
 
 [TestClass]
 public class LightningPaymentsSettingsTests

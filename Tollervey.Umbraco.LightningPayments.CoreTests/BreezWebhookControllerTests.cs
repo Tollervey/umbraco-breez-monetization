@@ -4,10 +4,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Tollervey.LightningPayments.Breez.Configuration;
-using Tollervey.LightningPayments.Breez.Models;
-using Tollervey.LightningPayments.Breez.Services;
-using Tollervey.Umbraco.LightningPayments.Core.Controllers;
-using Tollervey.Umbraco.LightningPayments.Core.Models;
+using Tollervey.Umbraco.LightningPayments.UI.Controllers;
+using Tollervey.Umbraco.LightningPayments.UI.Models;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.CoreTests;
 
