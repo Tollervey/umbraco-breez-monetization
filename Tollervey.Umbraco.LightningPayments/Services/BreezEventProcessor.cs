@@ -1,15 +1,11 @@
-using System;
 using System.Diagnostics;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Breez.Sdk.Liquid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Tollervey.Umbraco.LightningPayments.UI.Services;
 
-namespace Tollervey.LightningPayments.Breez.Services
+namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
     internal class BreezEventProcessor : IBreezEventProcessor, IHostedService, IDisposable
     {

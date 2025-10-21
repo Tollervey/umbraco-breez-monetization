@@ -2,8 +2,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Tollervey.LightningPayments.Breez.Configuration;
-using Tollervey.LightningPayments.Breez.Services;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Services;

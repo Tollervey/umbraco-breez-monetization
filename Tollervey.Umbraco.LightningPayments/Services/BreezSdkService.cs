@@ -6,11 +6,10 @@ using Polly;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
-using Tollervey.LightningPayments.Breez.Configuration;
+using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
-using Tollervey.Umbraco.LightningPayments.UI.Services;
 
-namespace Tollervey.LightningPayments.Breez.Services
+namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
     public class BreezSdkService : IBreezSdkService, IAsyncDisposable
     {

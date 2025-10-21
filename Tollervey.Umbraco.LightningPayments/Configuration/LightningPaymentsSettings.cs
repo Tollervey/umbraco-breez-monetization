@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Tollervey.LightningPayments.Breez.Configuration
+namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
 {
     /// <summary>
     /// Configuration settings for the Lightning Payments extension.

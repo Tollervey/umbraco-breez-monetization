@@ -2,7 +2,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
-using Tollervey.LightningPayments.Breez.Configuration;
+using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {

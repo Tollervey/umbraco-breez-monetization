@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Options;
-using Tollervey.LightningPayments.Breez.Configuration;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
 {

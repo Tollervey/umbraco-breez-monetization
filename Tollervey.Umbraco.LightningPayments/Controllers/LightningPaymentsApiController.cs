@@ -3,7 +3,6 @@ using BTCPayServer.Lightning;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Tollervey.LightningPayments.Breez.Services;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Tollervey.Umbraco.LightningPayments.UI.Services;

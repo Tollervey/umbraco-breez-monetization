@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Tollervey.LightningPayments.Breez.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
