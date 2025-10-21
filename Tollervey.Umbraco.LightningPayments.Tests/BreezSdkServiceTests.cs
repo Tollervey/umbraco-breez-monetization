@@ -13,6 +13,7 @@ using System.IO;
 using System.Reflection;
 using System.Linq;
 using System.Dynamic;
+using System.Text.RegularExpressions;
 
 namespace Tollervey.Umbraco.LightningPayments.Tests;
 
@@ -613,6 +614,137 @@ public class BreezSdkServiceTests
             Assert.IsNotNull(await task);
         }
     }
+
+    #region Input Validation Tests
+
+    [TestMethod]
+    public void ValidateInvoiceAmount_ThrowsForZeroAmount()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceAmount(0));
+        Assert.AreEqual("Invoice amount must be greater than 0.", ex.Message);
+    }
+
+    [TestMethod]
+    public void ValidateInvoiceAmount_ThrowsForAmountExceedingMax()
+    {
+        // Arrange
+        _settings = new LightningPaymentsSettings { MaxInvoiceAmountSat = 1000 };
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceAmount(1001));
+        Assert.AreEqual("Invoice amount exceeds maximum of 1000.", ex.Message);
+    }
+
+    [TestMethod]
+    public void ValidateInvoiceAmount_AllowsValidAmount()
+    {
+        // Arrange
+        _settings = new LightningPaymentsSettings { MaxInvoiceAmountSat = 1000 };
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act
+        service.ValidateInvoiceAmount(1000);
+
+        // Assert - no exception thrown
+    }
+
+    [TestMethod]
+    public void ValidateInvoiceDescription_ThrowsForEmptyDescription()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceDescription(" "));
+        Assert.AreEqual("Invoice description cannot be empty.", ex.Message);
+    }
+
+    [TestMethod]
+    public void ValidateInvoiceDescription_ThrowsForLongDescription()
+    {
+        // Arrange
+        _settings = new LightningPaymentsSettings { MaxInvoiceDescriptionLength = 10 };
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceDescription("12345678901"));
+        Assert.AreEqual("Invoice description length exceeds maximum of 10.", ex.Message);
+    }
+
+    [TestMethod]
+    public void ValidateInvoiceDescription_ThrowsForInvalidCharacters()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceDescription("Description with <script>"));
+        Assert.AreEqual("Invoice description contains invalid characters.", ex.Message);
+    }
+
+    [TestMethod]
+    public void ValidateInvoiceDescription_AllowsValidDescription()
+    {
+        // Arrange
+        _settings = new LightningPaymentsSettings { MaxInvoiceDescriptionLength = 50 };
+        _settingsMock.Setup(s => s.Value).Returns(_settings);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act
+        service.ValidateInvoiceDescription("A valid description with punctuation.");
+
+        // Assert - no exception thrown
+    }
+
+    [TestMethod]
+    public async Task CreateInvoiceAsync_ThrowsInvalidInvoiceRequestException_ForInvalidAmount()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateInvoiceAsync(0, "test"));
+    }
+
+    [TestMethod]
+    public async Task CreateInvoiceAsync_ThrowsInvalidInvoiceRequestException_ForInvalidDescription()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateInvoiceAsync(100, " "));
+    }
+
+    [TestMethod]
+    public async Task CreateBolt12OfferAsync_ThrowsInvalidInvoiceRequestException_ForInvalidAmount()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateBolt12OfferAsync(0, "test"));
+    }
+
+    [TestMethod]
+    public async Task CreateBolt12OfferAsync_ThrowsInvalidInvoiceRequestException_ForInvalidDescription()
+    {
+        // Arrange
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
+
+        // Act & Assert
+        await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateBolt12OfferAsync(100, " "));
+    }
+
+    #endregion
 
     [TestMethod]
     public async Task EventListener_OnPaymentSucceededEvent_HandlesExceptionInConfirm()

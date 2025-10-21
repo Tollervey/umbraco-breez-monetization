@@ -10,6 +10,7 @@ using Tollervey.LightningPayments.Breez.Models;
 using Polly;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text.RegularExpressions;
 
 namespace Tollervey.LightningPayments.Breez.Services
 {
@@ -141,6 +142,9 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         public async Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
+            ValidateInvoiceAmount(amountSat);
+            ValidateInvoiceDescription(description);
+
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
             if (sdk == null)
             {
@@ -162,7 +166,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
                 return res.destination;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not InvalidInvoiceRequestException)
             {
                 throw new InvoiceException("Failed to create invoice via Breez SDK.", ex);
             }
@@ -170,6 +174,9 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         public async Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
+            ValidateInvoiceAmount(amountSat);
+            ValidateInvoiceDescription(description);
+
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
             if (sdk == null)
             {
@@ -191,7 +198,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
                 return res.destination;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not InvalidInvoiceRequestException)
             {
                 throw new InvoiceException("Failed to create Bolt12 offer via Breez SDK.", ex);
             }
@@ -249,6 +256,42 @@ namespace Tollervey.LightningPayments.Breez.Services
             // For example: if(uri.Host != "your-expected-host.com") { ... }
 
             return true;
+        }
+
+        internal void ValidateInvoiceAmount(ulong amountSat)
+        {
+            if (amountSat == 0)
+            {
+                _logger.LogWarning("Invoice amount must be greater than 0.");
+                throw new InvalidInvoiceRequestException("Invoice amount must be greater than 0.");
+            }
+
+            if (amountSat > _settings.MaxInvoiceAmountSat)
+            {
+                _logger.LogWarning("Invoice amount {AmountSat} exceeds maximum of {MaxAmountSat}.", amountSat, _settings.MaxInvoiceAmountSat);
+                throw new InvalidInvoiceRequestException($"Invoice amount exceeds maximum of {_settings.MaxInvoiceAmountSat}.");
+            }
+        }
+
+        internal void ValidateInvoiceDescription(string description)
+        {
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                _logger.LogWarning("Invoice description cannot be empty.");
+                throw new InvalidInvoiceRequestException("Invoice description cannot be empty.");
+            }
+
+            if (description.Length > _settings.MaxInvoiceDescriptionLength)
+            {
+                _logger.LogWarning("Invoice description length {Length} exceeds maximum of {MaxLength}.", description.Length, _settings.MaxInvoiceDescriptionLength);
+                throw new InvalidInvoiceRequestException($"Invoice description length exceeds maximum of {_settings.MaxInvoiceDescriptionLength}.");
+            }
+
+            if (!Regex.IsMatch(description, @"^[\w\s.,'?!@#$%^&*()_+-=\[\]{}|;:]*$"))
+            {
+                _logger.LogWarning("Invoice description contains invalid characters.");
+                throw new InvalidInvoiceRequestException("Invoice description contains invalid characters.");
+            }
         }
 
         internal class SdkLogger : Logger
