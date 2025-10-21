@@ -98,6 +98,18 @@ namespace Tollervey.LightningPayments.Breez.Configuration
         [EmailAddress]
         [MinLength(1)]
         public string FromEmailAddress { get; init; } = string.Empty;
+
+        /// <summary>
+        /// The maximum invoice amount in satoshis.
+        /// </summary>
+        [Range(1, ulong.MaxValue)]
+        public ulong MaxInvoiceAmountSat { get; init; } = 10_000_000;
+
+        /// <summary>
+        /// The maximum length of the invoice description.
+        /// </summary>
+        [Range(1, 1024)]
+        public int MaxInvoiceDescriptionLength { get; init; } = 200;
     }
 
 }

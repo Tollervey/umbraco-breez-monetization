@@ -5,12 +5,13 @@ namespace Tollervey.LightningPayments.Breez.Services
     public interface IBreezSdkWrapper
     {
         Config DefaultConfig(LiquidNetwork network, string apiKey);
-        BindingLiquidSdk Connect(ConnectRequest request);
+        Task<BindingLiquidSdk> ConnectAsync(ConnectRequest request, CancellationToken ct = default);
         void SetLogger(Logger logger);
-        PrepareReceiveResponse PrepareReceivePayment(BindingLiquidSdk sdk, PrepareReceiveRequest request);
-        ReceivePaymentResponse ReceivePayment(BindingLiquidSdk sdk, ReceivePaymentRequest request);
-        void RegisterWebhook(BindingLiquidSdk sdk, string webhookUrl);
-        void Disconnect(BindingLiquidSdk sdk);
+        Task<PrepareReceiveResponse> PrepareReceivePaymentAsync(BindingLiquidSdk sdk, PrepareReceiveRequest request, CancellationToken ct = default);
+        Task<ReceivePaymentResponse> ReceivePaymentAsync(BindingLiquidSdk sdk, ReceivePaymentRequest request, CancellationToken ct = default);
+        Task RegisterWebhookAsync(BindingLiquidSdk sdk, string webhookUrl, CancellationToken ct = default);
+        Task DisconnectAsync(BindingLiquidSdk sdk, CancellationToken ct = default);
         void AddEventListener(BindingLiquidSdk sdk, EventListener listener);
+        void RemoveEventListener(BindingLiquidSdk sdk, EventListener listener);
     }
 }

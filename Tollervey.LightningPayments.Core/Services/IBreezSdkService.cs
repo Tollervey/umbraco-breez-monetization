@@ -2,7 +2,8 @@ namespace Tollervey.LightningPayments.Breez.Services
 {
     public interface IBreezSdkService : IAsyncDisposable
     {
-        Task<string> CreateInvoiceAsync(ulong amountSat, string description);
-        Task<string> CreateBolt12OfferAsync(ulong amountSat, string description);
+        Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default);
+        Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default);
+        Task<bool> IsConnectedAsync(CancellationToken ct = default);
     }
 }

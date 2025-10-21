@@ -6,18 +6,30 @@ namespace Tollervey.LightningPayments.Breez.Services
     {
         public Config DefaultConfig(LiquidNetwork network, string apiKey) => BreezSdkLiquidMethods.DefaultConfig(network, apiKey);
 
-        public BindingLiquidSdk Connect(ConnectRequest request) => BreezSdkLiquidMethods.Connect(request);
+        // The underlying SDK method is blocking. Task.Run is used to avoid blocking the calling thread.
+        public Task<BindingLiquidSdk> ConnectAsync(ConnectRequest request, CancellationToken ct = default) => Task.Run(() => BreezSdkLiquidMethods.Connect(request), ct);
 
         public void SetLogger(Logger logger) => BreezSdkLiquidMethods.SetLogger(logger);
 
-        public PrepareReceiveResponse PrepareReceivePayment(BindingLiquidSdk sdk, PrepareReceiveRequest request) => sdk.PrepareReceivePayment(request);
+        // The underlying SDK method is blocking. Task.Run is used to avoid blocking the calling thread.
+        public Task<PrepareReceiveResponse> PrepareReceivePaymentAsync(BindingLiquidSdk sdk, PrepareReceiveRequest request, CancellationToken ct = default) => Task.Run(() => sdk.PrepareReceivePayment(request), ct);
 
-        public ReceivePaymentResponse ReceivePayment(BindingLiquidSdk sdk, ReceivePaymentRequest request) => sdk.ReceivePayment(request);
+        // The underlying SDK method is blocking. Task.Run is used to avoid blocking the calling thread.
+        public Task<ReceivePaymentResponse> ReceivePaymentAsync(BindingLiquidSdk sdk, ReceivePaymentRequest request, CancellationToken ct = default) => Task.Run(() => sdk.ReceivePayment(request), ct);
 
-        public void RegisterWebhook(BindingLiquidSdk sdk, string webhookUrl) => sdk.RegisterWebhook(webhookUrl);
+        // The underlying SDK method is blocking. Task.Run is used to avoid blocking the calling thread.
+        public Task RegisterWebhookAsync(BindingLiquidSdk sdk, string webhookUrl, CancellationToken ct = default) => Task.Run(() => sdk.RegisterWebhook(webhookUrl), ct);
 
-        public void Disconnect(BindingLiquidSdk sdk) => sdk.Disconnect();
+        // The underlying SDK method is blocking. Task.Run is used to avoid blocking the calling thread.
+        public Task DisconnectAsync(BindingLiquidSdk sdk, CancellationToken ct = default) => Task.Run(() => sdk.Disconnect(), ct);
 
         public void AddEventListener(BindingLiquidSdk sdk, EventListener listener) => sdk.AddEventListener(listener);
+
+        public void RemoveEventListener(BindingLiquidSdk sdk, EventListener listener)
+        {
+            // Note: The Breez SDK does not currently support removing event listeners.
+            // This is a placeholder for when/if it becomes available.
+            // sdk.RemoveEventListener(listener);
+        }
     }
 }
