@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading;
 using Breez.Sdk.Liquid;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -36,17 +35,15 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly IAsyncPolicy<ReceivePaymentResponse> _receivePolicy;
 
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IServiceScopeFactory _scopeFactory;
         private readonly IBreezEventProcessor _breezEventProcessor;
 
-        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, IServiceScopeFactory scopeFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper, IBreezEventProcessor breezEventProcessor)
+        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper, IBreezEventProcessor breezEventProcessor)
         {
             _settings = settings.Value;
             _logger = logger;
             _hostEnvironment = hostEnvironment;
             _wrapper = wrapper;
             _loggerFactory = loggerFactory;
-            _scopeFactory = scopeFactory;
             _breezEventProcessor = breezEventProcessor;
             _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(() => InitializeSdkAsync(), LazyThreadSafetyMode.ExecutionAndPublication);
 
@@ -151,11 +148,12 @@ namespace Tollervey.LightningPayments.Breez.Services
             }
         }
 
-        public async Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default)
+        private async Task<string> CreatePaymentAsync(ulong amountSat, string description, PaymentMethod paymentMethod, string paymentType, CancellationToken ct)
         {
-            using var activity = _activity.StartActivity(nameof(CreateInvoiceAsync));
+            using var activity = _activity.StartActivity(nameof(CreatePaymentAsync));
             activity?.SetTag("amountSat", amountSat);
             activity?.SetTag("description.length", description.Length);
+            activity?.SetTag("paymentMethod", paymentMethod.ToString());
 
             ValidateInvoiceAmount(amountSat);
             ValidateInvoiceDescription(description);
@@ -171,11 +169,11 @@ namespace Tollervey.LightningPayments.Breez.Services
             try
             {
                 var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
-                var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt11Invoice, optionalAmount);
+                var prepareRequest = new PrepareReceiveRequest(paymentMethod, optionalAmount);
 
                 ct.ThrowIfCancellationRequested();
                 var prepareResponse = await _preparePolicy.ExecuteAsync((token) => _wrapper.PrepareReceivePaymentAsync(sdk, prepareRequest, token), ct);
-                _logger.LogInformation("Breez SDK invoice creation fee: {FeeSat} sats", prepareResponse.feesSat);
+                _logger.LogInformation("Breez SDK {PaymentType} creation fee: {FeeSat} sats", paymentType, prepareResponse.feesSat);
                 activity?.SetTag("feesSat", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
@@ -188,49 +186,18 @@ namespace Tollervey.LightningPayments.Breez.Services
             catch (Exception ex) when (ex is not InvalidInvoiceRequestException)
             {
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                throw new InvoiceException("Failed to create invoice via Breez SDK.", ex);
+                throw new InvoiceException($"Failed to create {paymentType} via Breez SDK.", ex);
             }
         }
 
-        public async Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default)
+        public Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
-            using var activity = _activity.StartActivity(nameof(CreateBolt12OfferAsync));
-            activity?.SetTag("amountSat", amountSat);
-            activity?.SetTag("description.length", description.Length);
+            return CreatePaymentAsync(amountSat, description, PaymentMethod.Bolt11Invoice, "invoice", ct);
+        }
 
-            ValidateInvoiceAmount(amountSat);
-            ValidateInvoiceDescription(description);
-
-            var sdk = await _sdkInstance.Value.WaitAsync(ct);
-            if (sdk == null)
-            {
-                var ex = new InvalidOperationException("Breez SDK is not connected.");
-                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                throw ex;
-            }
-
-            try
-            {
-                var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
-                var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt12Offer, optionalAmount);
-
-                ct.ThrowIfCancellationRequested();
-                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => _wrapper.PrepareReceivePaymentAsync(sdk, prepareRequest, token), ct);
-                _logger.LogInformation("Breez SDK offer creation fee: {FeeSat} sats", prepareResponse.feesSat);
-                activity?.SetTag("feesSat", prepareResponse.feesSat);
-
-                var req = new ReceivePaymentRequest(prepareResponse, description);
-
-                ct.ThrowIfCancellationRequested();
-                var res = await _receivePolicy.ExecuteAsync((token) => _wrapper.ReceivePaymentAsync(sdk, req, token), ct);
-                activity?.SetStatus(ActivityStatusCode.Ok);
-                return res.destination;
-            }
-            catch (Exception ex) when (ex is not InvalidInvoiceRequestException)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                throw new InvoiceException("Failed to create Bolt12 offer via Breez SDK.", ex);
-            }
+        public Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default)
+        {
+            return CreatePaymentAsync(amountSat, description, PaymentMethod.Bolt12Offer, "Bolt12 offer", ct);
         }
 
         public async Task<bool> IsConnectedAsync(CancellationToken ct = default)

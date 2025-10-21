@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Tollervey.LightningPayments.Breez.Configuration;
 using Tollervey.LightningPayments.Breez.Models;
@@ -22,7 +21,6 @@ public class BreezSdkServiceTests
 {
     private Mock<ILogger<BreezSdkService>> _loggerMock;
     private Mock<IHostEnvironment> _hostEnvironmentMock;
-    private Mock<IServiceScopeFactory> _scopeFactoryMock;
     private Mock<ILoggerFactory> _loggerFactoryMock;
     private Mock<IOptions<LightningPaymentsSettings>> _settingsMock;
     private Mock<IBreezSdkWrapper> _wrapperMock;
@@ -34,7 +32,6 @@ public class BreezSdkServiceTests
     {
         _loggerMock = new Mock<ILogger<BreezSdkService>>();
         _hostEnvironmentMock = new Mock<IHostEnvironment>();
-        _scopeFactoryMock = new Mock<IServiceScopeFactory>();
         _loggerFactoryMock = new Mock<ILoggerFactory>();
         _settingsMock = new Mock<IOptions<LightningPaymentsSettings>>();
         _wrapperMock = new Mock<IBreezSdkWrapper>();
@@ -59,7 +56,7 @@ public class BreezSdkServiceTests
     public void Constructor_InitializesLazySdk()
     {
         // Act
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Assert
         Assert.IsNotNull(service);
@@ -75,7 +72,7 @@ public class BreezSdkServiceTests
         };
         _settingsMock.Setup(s => s.Value).Returns(invalidSettings);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Use reflection to call private method
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -94,7 +91,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
@@ -118,7 +115,7 @@ public class BreezSdkServiceTests
         };
         _settingsMock.Setup(s => s.Value).Returns(invalidSettings);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         await service.CreateInvoiceAsync(100, "test");
     }
@@ -136,7 +133,7 @@ public class BreezSdkServiceTests
         var receiveResponse = new ReceivePaymentResponse("bolt11-invoice", null, null);
         _wrapperMock.Setup(w => w.ReceivePaymentAsync(sdkMock.Object, It.IsAny<ReceivePaymentRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(receiveResponse);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -156,7 +153,7 @@ public class BreezSdkServiceTests
 
         _wrapperMock.Setup(w => w.PrepareReceivePaymentAsync(sdkMock.Object, It.IsAny<PrepareReceiveRequest>(), It.IsAny<CancellationToken>())).Throws(new Exception("SDK error"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -178,7 +175,7 @@ public class BreezSdkServiceTests
         var receiveResponse = new ReceivePaymentResponse("bolt12-offer", null, null);
         _wrapperMock.Setup(w => w.ReceivePaymentAsync(sdkMock.Object, It.IsAny<ReceivePaymentRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(receiveResponse);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -195,7 +192,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization by calling a method
         await service.CreateInvoiceAsync(100, "test");
@@ -210,7 +207,7 @@ public class BreezSdkServiceTests
     {
         _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).Throws(new Exception("Connect failed"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
@@ -235,7 +232,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
@@ -260,7 +257,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -294,7 +291,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -319,7 +316,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
 
         // Act
@@ -340,7 +337,7 @@ public class BreezSdkServiceTests
 
         _wrapperMock.Setup(w => w.PrepareReceivePaymentAsync(sdkMock.Object, It.IsAny<PrepareReceiveRequest>(), It.IsAny<CancellationToken>())).Throws(new Exception("SDK error"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -382,7 +379,7 @@ public class BreezSdkServiceTests
         );
         _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
@@ -396,7 +393,7 @@ public class BreezSdkServiceTests
     [TestMethod]
     public async Task DisposeAsync_WhenNotInitialized_DoesNothing()
     {
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Do not trigger initialization
 
@@ -476,7 +473,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         await (Task)method.Invoke(service, new object[] { CancellationToken.None });
@@ -509,7 +506,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -542,7 +539,7 @@ public class BreezSdkServiceTests
 
         _wrapperMock.Setup(w => w.DisconnectAsync(sdkMock.Object, It.IsAny<CancellationToken>())).Throws(new Exception("Disconnect failed"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Trigger initialization
         await service.CreateInvoiceAsync(100, "test");
@@ -562,7 +559,7 @@ public class BreezSdkServiceTests
         _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdkMock.Object);
         _wrapperMock.Setup(w => w.RegisterWebhookAsync(sdkMock.Object, It.IsAny<string>(), It.IsAny<CancellationToken>())).Throws(new Exception("Webhook registration failed"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
@@ -579,7 +576,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
         // Act
@@ -600,7 +597,7 @@ public class BreezSdkServiceTests
     public void ValidateInvoiceAmount_ThrowsForZeroAmount()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceAmount(0));
@@ -613,7 +610,7 @@ public class BreezSdkServiceTests
         // Arrange
         _settings = new LightningPaymentsSettings { MaxInvoiceAmountSat = 1000 };
         _settingsMock.Setup(s => s.Value).Returns(_settings);
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceAmount(1001));
@@ -626,7 +623,7 @@ public class BreezSdkServiceTests
         // Arrange
         _settings = new LightningPaymentsSettings { MaxInvoiceAmountSat = 1000 };
         _settingsMock.Setup(s => s.Value).Returns(_settings);
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act
         service.ValidateInvoiceAmount(1000);
@@ -638,7 +635,7 @@ public class BreezSdkServiceTests
     public void ValidateInvoiceDescription_ThrowsForEmptyDescription()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceDescription(" "));
@@ -651,7 +648,7 @@ public class BreezSdkServiceTests
         // Arrange
         _settings = new LightningPaymentsSettings { MaxInvoiceDescriptionLength = 10 };
         _settingsMock.Setup(s => s.Value).Returns(_settings);
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceDescription("12345678901"));
@@ -662,7 +659,7 @@ public class BreezSdkServiceTests
     public void ValidateInvoiceDescription_ThrowsForInvalidCharacters()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         var ex = Assert.ThrowsException<InvalidInvoiceRequestException>(() => service.ValidateInvoiceDescription("Description with <script>"));
@@ -675,7 +672,7 @@ public class BreezSdkServiceTests
         // Arrange
         _settings = new LightningPaymentsSettings { MaxInvoiceDescriptionLength = 50 };
         _settingsMock.Setup(s => s.Value).Returns(_settings);
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act
         service.ValidateInvoiceDescription("A valid description with punctuation.");
@@ -687,7 +684,7 @@ public class BreezSdkServiceTests
     public async Task CreateInvoiceAsync_ThrowsInvalidInvoiceRequestException_ForInvalidAmount()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateInvoiceAsync(0, "test"));
@@ -697,7 +694,7 @@ public class BreezSdkServiceTests
     public async Task CreateInvoiceAsync_ThrowsInvalidInvoiceRequestException_ForInvalidDescription()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateInvoiceAsync(100, " "));
@@ -707,7 +704,7 @@ public class BreezSdkServiceTests
     public async Task CreateBolt12OfferAsync_ThrowsInvalidInvoiceRequestException_ForInvalidAmount()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateBolt12OfferAsync(0, "test"));
@@ -717,7 +714,7 @@ public class BreezSdkServiceTests
     public async Task CreateBolt12OfferAsync_ThrowsInvalidInvoiceRequestException_ForInvalidDescription()
     {
         // Arrange
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
         // Act & Assert
         await Assert.ThrowsExceptionAsync<InvalidInvoiceRequestException>(() => service.CreateBolt12OfferAsync(100, " "));
