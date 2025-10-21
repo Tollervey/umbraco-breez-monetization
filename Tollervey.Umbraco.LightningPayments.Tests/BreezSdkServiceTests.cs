@@ -21,7 +21,8 @@ public class BreezSdkServiceTests
 {
     private Mock<ILogger<BreezSdkService>> _loggerMock;
     private Mock<IHostEnvironment> _hostEnvironmentMock;
-    private Mock<IServiceProvider> _serviceProviderMock;
+    private Mock<IServiceScopeFactory> _scopeFactoryMock;
+    private Mock<ILoggerFactory> _loggerFactoryMock;
     private Mock<IOptions<LightningPaymentsSettings>> _settingsMock;
     private Mock<IBreezSdkWrapper> _wrapperMock;
     private LightningPaymentsSettings _settings;
@@ -31,7 +32,8 @@ public class BreezSdkServiceTests
     {
         _loggerMock = new Mock<ILogger<BreezSdkService>>();
         _hostEnvironmentMock = new Mock<IHostEnvironment>();
-        _serviceProviderMock = new Mock<IServiceProvider>();
+        _scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        _loggerFactoryMock = new Mock<ILoggerFactory>();
         _settingsMock = new Mock<IOptions<LightningPaymentsSettings>>();
         _wrapperMock = new Mock<IBreezSdkWrapper>();
 
@@ -47,14 +49,14 @@ public class BreezSdkServiceTests
         _hostEnvironmentMock.Setup(h => h.ContentRootPath).Returns("test-path");
 
         // Setup service provider to return logger when requested
-        _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
+        _loggerFactoryMock.Setup(x => x.CreateLogger(It.IsAny<string>())).Returns(_loggerMock.Object);
     }
 
     [TestMethod]
     public void Constructor_InitializesLazySdk()
     {
         // Act
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Assert
         Assert.IsNotNull(service);
@@ -70,7 +72,7 @@ public class BreezSdkServiceTests
         };
         _settingsMock.Setup(s => s.Value).Returns(invalidSettings);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Use reflection to call private method
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -89,7 +91,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
@@ -113,7 +115,7 @@ public class BreezSdkServiceTests
         };
         _settingsMock.Setup(s => s.Value).Returns(invalidSettings);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         await service.CreateInvoiceAsync(100, "test");
     }
@@ -131,7 +133,7 @@ public class BreezSdkServiceTests
         var receiveResponse = new ReceivePaymentResponse("bolt11-invoice", null, null);
         _wrapperMock.Setup(w => w.ReceivePayment(sdkMock.Object, It.IsAny<ReceivePaymentRequest>())).Returns(receiveResponse);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -151,7 +153,7 @@ public class BreezSdkServiceTests
 
         _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Throws(new Exception("SDK error"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -173,7 +175,7 @@ public class BreezSdkServiceTests
         var receiveResponse = new ReceivePaymentResponse("bolt12-offer", null, null);
         _wrapperMock.Setup(w => w.ReceivePayment(sdkMock.Object, It.IsAny<ReceivePaymentRequest>())).Returns(receiveResponse);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -190,7 +192,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization by calling a method
         await service.CreateInvoiceAsync(100, "test");
@@ -205,7 +207,7 @@ public class BreezSdkServiceTests
     {
         _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Throws(new Exception("Connect failed"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
@@ -230,7 +232,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
@@ -248,7 +250,7 @@ public class BreezSdkServiceTests
 
         _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Throws(new Exception("SDK error"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -290,7 +292,7 @@ public class BreezSdkServiceTests
         );
         _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
@@ -304,7 +306,7 @@ public class BreezSdkServiceTests
     [TestMethod]
     public async Task DisposeAsync_WhenNotInitialized_DoesNothing()
     {
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Do not trigger initialization
 
@@ -330,10 +332,9 @@ public class BreezSdkServiceTests
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         scopeFactoryMock.Setup(f => f.CreateScope()).Returns(serviceScopeMock.Object);
 
-        _serviceProviderMock.Setup(sp => sp.GetService(typeof(IServiceScopeFactory))).Returns(scopeFactoryMock.Object);
-        _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
+        _scopeFactoryMock.Setup(f => f.CreateScope()).Returns(serviceScopeMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization to set up the listener
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -348,8 +349,8 @@ public class BreezSdkServiceTests
             var listenerType = nestedTypes.FirstOrDefault(t => t.Name == "SdkEventListener");
             if (listenerType != null)
             {
-                var constructor = listenerType.GetConstructor(new[] { typeof(IServiceProvider) });
-                var listenerInstance = constructor.Invoke(new object[] { _serviceProviderMock.Object }) as EventListener;
+                var constructor = listenerType.GetConstructor(new[] { typeof(IServiceScopeFactory), typeof(ILogger<BreezSdkService.SdkEventListener>), typeof(CancellationToken) });
+                var listenerInstance = constructor.Invoke(new object[] { _scopeFactoryMock.Object, new Mock<ILogger<BreezSdkService.SdkEventListener>>().Object, CancellationToken.None }) as EventListener;
 
                 // Simulate event
                 dynamic details = new ExpandoObject();
@@ -365,8 +366,7 @@ public class BreezSdkServiceTests
                 var paymentSucceededType = typeof(SdkEvent.PaymentSucceeded);
                 var testSucceeded = Activator.CreateInstance(paymentSucceededType, dummyPayment) as SdkEvent.PaymentSucceeded;
 
-                // Use reflection to set details if possible, but since it's dynamic, we can use a wrapper
-                // Since dynamic is used, we can pass the dynamic object directly if we trick the type
+                // Use reflection to set details if possible, but since it's dynamic, we can pass the dynamic object directly if we trick the type
                 // But to avoid, let's invoke the lambda directly using reflection
 
                 // Find the nested SdkEventListener type
@@ -400,7 +400,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         await (Task)method.Invoke(service, null);
@@ -433,9 +433,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
-
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -446,8 +444,8 @@ public class BreezSdkServiceTests
         var listenerType = nestedTypes.FirstOrDefault(t => t.Name == "SdkEventListener");
         if (listenerType != null)
         {
-            var constructor = listenerType.GetConstructor(new[] { typeof(IServiceProvider) });
-            var listenerInstance = constructor.Invoke(new object[] { _serviceProviderMock.Object }) as EventListener;
+            var constructor = listenerType.GetConstructor(new[] { typeof(IServiceScopeFactory), typeof(ILogger<BreezSdkService.SdkEventListener>), typeof(CancellationToken) });
+            var listenerInstance = constructor.Invoke(new object[] { _scopeFactoryMock.Object, new Mock<ILogger<BreezSdkService.SdkEventListener>>().Object, CancellationToken.None }) as EventListener;
 
             // Simulate a non-PaymentSucceeded event, e.g., Synced
             var otherEvent = new SdkEvent.Synced();
@@ -470,7 +468,7 @@ public class BreezSdkServiceTests
 
         _wrapperMock.Setup(w => w.Disconnect(sdkMock.Object)).Throws(new Exception("Disconnect failed"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         await service.CreateInvoiceAsync(100, "test");
@@ -490,7 +488,7 @@ public class BreezSdkServiceTests
         _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdkMock.Object);
         _wrapperMock.Setup(w => w.RegisterWebhook(sdkMock.Object, It.IsAny<string>())).Throws(new Exception("Webhook registration failed"));
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, null);
@@ -507,7 +505,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         var method = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
@@ -540,10 +538,9 @@ public class BreezSdkServiceTests
         var scopeFactoryMock = new Mock<IServiceScopeFactory>();
         scopeFactoryMock.Setup(f => f.CreateScope()).Returns(serviceScopeMock.Object);
 
-        _serviceProviderMock.Setup(sp => sp.GetService(typeof(IServiceScopeFactory))).Returns(scopeFactoryMock.Object);
-        _serviceProviderMock.Setup(sp => sp.GetService(typeof(ILogger<BreezSdkService>))).Returns(_loggerMock.Object);
+        _scopeFactoryMock.Setup(f => f.CreateScope()).Returns(serviceScopeMock.Object);
 
-        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _serviceProviderMock.Object, _loggerMock.Object, _wrapperMock.Object);
+        var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object);
 
         // Trigger initialization
         var initMethod = typeof(BreezSdkService).GetMethod("InitializeSdkAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -557,8 +554,8 @@ public class BreezSdkServiceTests
             Assert.Fail("Could not find SdkEventListener type");
         }
 
-        var constructor = listenerType.GetConstructor(new[] { typeof(IServiceProvider) });
-        var listenerInstance = constructor.Invoke(new object[] { _serviceProviderMock.Object }) as EventListener;
+        var constructor = listenerType.GetConstructor(new[] { typeof(IServiceScopeFactory), typeof(ILogger<BreezSdkService.SdkEventListener>), typeof(CancellationToken) });
+        var listenerInstance = constructor.Invoke(new object[] { _scopeFactoryMock.Object, new Mock<ILogger<BreezSdkService.SdkEventListener>>().Object, CancellationToken.None }) as EventListener;
 
         // Simulate event
         dynamic details = new ExpandoObject();
