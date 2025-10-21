@@ -19,5 +19,12 @@ namespace Tollervey.LightningPayments.Breez.Services
         public void Disconnect(BindingLiquidSdk sdk) => sdk.Disconnect();
 
         public void AddEventListener(BindingLiquidSdk sdk, EventListener listener) => sdk.AddEventListener(listener);
+
+        public void RemoveEventListener(BindingLiquidSdk sdk, EventListener listener)
+        {
+            // Note: The Breez SDK does not currently support removing event listeners.
+            // This is a placeholder for when/if it becomes available.
+            // sdk.RemoveEventListener(listener);
+        }
     }
 }

@@ -12,5 +12,6 @@ namespace Tollervey.LightningPayments.Breez.Services
         void RegisterWebhook(BindingLiquidSdk sdk, string webhookUrl);
         void Disconnect(BindingLiquidSdk sdk);
         void AddEventListener(BindingLiquidSdk sdk, EventListener listener);
+        void RemoveEventListener(BindingLiquidSdk sdk, EventListener listener);
     }
 }

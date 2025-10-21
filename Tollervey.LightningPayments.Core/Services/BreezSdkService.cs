@@ -28,6 +28,7 @@ namespace Tollervey.LightningPayments.Breez.Services
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private int _disposed = 0;
         private bool _webhookRegistered = false;
+        private SdkEventListener? _eventListener;
 
         private readonly IAsyncPolicy<BindingLiquidSdk> _connectPolicy;
         private readonly IAsyncPolicy _webhookPolicy;
@@ -110,7 +111,8 @@ namespace Tollervey.LightningPayments.Breez.Services
 
                 ct.ThrowIfCancellationRequested();
                 var sdk = await _connectPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.Connect(connectRequest), token), ct);
-                _wrapper.AddEventListener(sdk, new SdkEventListener(_scopeFactory, _loggerFactory.CreateLogger<SdkEventListener>(), _cts.Token));
+                _eventListener = new SdkEventListener(_scopeFactory, _loggerFactory.CreateLogger<SdkEventListener>(), () => _disposed == 1);
+                _wrapper.AddEventListener(sdk, _eventListener);
                 _logger.LogInformation("Breez SDK connected successfully.");
 
                 if (!string.IsNullOrWhiteSpace(_settings.WebhookUrl))
@@ -242,6 +244,9 @@ namespace Tollervey.LightningPayments.Breez.Services
                 return;
             }
 
+            // Cancel any ongoing operations
+            _cts.Cancel();
+
             if (_sdkInstance.IsValueCreated)
             {
                 var sdk = await _sdkInstance.Value;
@@ -249,6 +254,11 @@ namespace Tollervey.LightningPayments.Breez.Services
                 {
                     if (sdk != null)
                     {
+                        if (_eventListener != null)
+                        {
+                            // Although the SDK may not support removal, we call it for future-proofing.
+                            _wrapper.RemoveEventListener(sdk, _eventListener);
+                        }
                         _wrapper.Disconnect(sdk);
                     }
                     _logger.LogInformation("Breez SDK disconnected.");
@@ -259,7 +269,6 @@ namespace Tollervey.LightningPayments.Breez.Services
                 }
             }
 
-            _cts.Cancel();
             _cts.Dispose();
         }
 
@@ -346,17 +355,23 @@ namespace Tollervey.LightningPayments.Breez.Services
         {
             private readonly ILogger<SdkEventListener> _logger;
             private readonly IServiceScopeFactory _scopeFactory;
-            private readonly CancellationToken _token;
+            private readonly Func<bool> _isDisposed;
 
-            public SdkEventListener(IServiceScopeFactory scopeFactory, ILogger<SdkEventListener> logger, CancellationToken token)
+            public SdkEventListener(IServiceScopeFactory scopeFactory, ILogger<SdkEventListener> logger, Func<bool> isDisposed)
             {
                 _scopeFactory = scopeFactory;
                 _logger = logger;
-                _token = token;
+                _isDisposed = isDisposed;
             }
 
             public void OnEvent(SdkEvent e)
             {
+                if (_isDisposed())
+                {
+                    _logger.LogWarning("BreezSDK: Ignoring event of type {EventType} because the service is disposed.", e.GetType().Name);
+                    return;
+                }
+
                 _logger.LogInformation("BreezSDK: Received event of type {EventType}: {EventDetails}", e.GetType().Name, e.ToString());
 
                 if (e is SdkEvent.PaymentSucceeded succeeded)
@@ -366,7 +381,8 @@ namespace Tollervey.LightningPayments.Breez.Services
                         using var activity = _activity.StartActivity("OnPaymentSucceeded");
                         try
                         {
-                            _token.ThrowIfCancellationRequested();
+                            if (_isDisposed()) return;
+
                             using var scope = _scopeFactory.CreateScope();
                             var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
                             var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
@@ -407,7 +423,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                                 return;
                             }
 
-                            _token.ThrowIfCancellationRequested();
+                            if (_isDisposed()) return;
                             await paymentService.ConfirmPaymentAsync(paymentHash);
                             _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
                             deduper.Complete(paymentHash);
@@ -418,7 +434,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                             _logger.LogError(ex, "Failed to confirm payment from SDK event.");
                         }
-                    }, _token);
+                    });
                 }
             }
         }
