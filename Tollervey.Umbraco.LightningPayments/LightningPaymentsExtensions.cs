@@ -47,8 +47,6 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
             // Register middleware
-            builder.Services.AddTransient<ExceptionHandlingMiddleware>();
-            builder.Services.AddTransient<PaywallMiddleware>();
             builder.Services.Configure<UmbracoPipelineOptions>(options =>
             {
                 options.AddFilter(new UmbracoPipelineFilter(nameof(ExceptionHandlingMiddleware))
