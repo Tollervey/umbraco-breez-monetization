@@ -11,11 +11,14 @@ using Polly;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
+using OpenTelemetry.Trace;
 
 namespace Tollervey.LightningPayments.Breez.Services
 {
     public class BreezSdkService : IBreezSdkService, IAsyncDisposable
     {
+        private static readonly ActivitySource _activity = new("BreezSdkService");
         private readonly ILogger<BreezSdkService> _logger;
         private readonly IHostEnvironment _hostEnvironment;
         private readonly LightningPaymentsSettings _settings;
@@ -78,6 +81,7 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         private async Task<BindingLiquidSdk?> InitializeSdkAsync(CancellationToken ct = default)
         {
+            using var activity = _activity.StartActivity(nameof(InitializeSdkAsync));
             bool acquired = false;
             try
             {
@@ -99,6 +103,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                     LightningPaymentsSettings.LightningNetwork.Testnet => LiquidNetwork.Testnet,
                     LightningPaymentsSettings.LightningNetwork.Regtest => LiquidNetwork.Regtest
                 };
+                activity?.SetTag("network", network.ToString());
 
                 var config = _wrapper.DefaultConfig(network, _settings.BreezApiKey) with { workingDir = workingDir };
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
@@ -124,10 +129,12 @@ namespace Tollervey.LightningPayments.Breez.Services
                     }
                 }
 
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return sdk;
             }
             catch (Exception ex)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 _logger.LogError(ex, "Failed to connect to Breez SDK.");
                 return null;
             }
@@ -142,13 +149,19 @@ namespace Tollervey.LightningPayments.Breez.Services
 
         public async Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
+            using var activity = _activity.StartActivity(nameof(CreateInvoiceAsync));
+            activity?.SetTag("amountSat", amountSat);
+            activity?.SetTag("description.length", description.Length);
+
             ValidateInvoiceAmount(amountSat);
             ValidateInvoiceDescription(description);
 
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
             if (sdk == null)
             {
-                throw new InvalidOperationException("Breez SDK is not connected.");
+                var ex = new InvalidOperationException("Breez SDK is not connected.");
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                throw ex;
             }
 
             try
@@ -159,28 +172,37 @@ namespace Tollervey.LightningPayments.Breez.Services
                 ct.ThrowIfCancellationRequested();
                 var prepareResponse = await _preparePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest), token), ct);
                 _logger.LogInformation("Breez SDK invoice creation fee: {FeeSat} sats", prepareResponse.feesSat);
+                activity?.SetTag("feesSat", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
 
                 ct.ThrowIfCancellationRequested();
                 var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return res.destination;
             }
             catch (Exception ex) when (ex is not InvalidInvoiceRequestException)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 throw new InvoiceException("Failed to create invoice via Breez SDK.", ex);
             }
         }
 
         public async Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
+            using var activity = _activity.StartActivity(nameof(CreateBolt12OfferAsync));
+            activity?.SetTag("amountSat", amountSat);
+            activity?.SetTag("description.length", description.Length);
+
             ValidateInvoiceAmount(amountSat);
             ValidateInvoiceDescription(description);
 
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
             if (sdk == null)
             {
-                throw new InvalidOperationException("Breez SDK is not connected.");
+                var ex = new InvalidOperationException("Breez SDK is not connected.");
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                throw ex;
             }
 
             try
@@ -191,15 +213,18 @@ namespace Tollervey.LightningPayments.Breez.Services
                 ct.ThrowIfCancellationRequested();
                 var prepareResponse = await _preparePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest), token), ct);
                 _logger.LogInformation("Breez SDK offer creation fee: {FeeSat} sats", prepareResponse.feesSat);
+                activity?.SetTag("feesSat", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
 
                 ct.ThrowIfCancellationRequested();
                 var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
+                activity?.SetStatus(ActivityStatusCode.Ok);
                 return res.destination;
             }
             catch (Exception ex) when (ex is not InvalidInvoiceRequestException)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 throw new InvoiceException("Failed to create Bolt12 offer via Breez SDK.", ex);
             }
         }
@@ -338,6 +363,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                 {
                     _ = Task.Run(async () =>
                     {
+                        using var activity = _activity.StartActivity("OnPaymentSucceeded");
                         try
                         {
                             _token.ThrowIfCancellationRequested();
@@ -361,10 +387,12 @@ namespace Tollervey.LightningPayments.Breez.Services
                                         }
                                     }
                                 }
+                                activity?.SetTag("paymentHash", paymentHash);
                             }
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, "Failed to extract paymentHash using reflection from SDK event.");
+                                activity?.SetStatus(ActivityStatusCode.Error, "Failed to extract paymentHash");
                             }
 
                             if (string.IsNullOrEmpty(paymentHash))
@@ -383,9 +411,11 @@ namespace Tollervey.LightningPayments.Breez.Services
                             await paymentService.ConfirmPaymentAsync(paymentHash);
                             _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
                             deduper.Complete(paymentHash);
+                            activity?.SetStatus(ActivityStatusCode.Ok);
                         }
                         catch (Exception ex)
                         {
+                            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                             _logger.LogError(ex, "Failed to confirm payment from SDK event.");
                         }
                     }, _token);
