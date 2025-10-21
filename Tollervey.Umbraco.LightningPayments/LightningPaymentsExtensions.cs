@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
@@ -8,7 +7,7 @@ using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
 
-namespace Tollervey.Umbraco.LightningPayments.UI
+namespace Microsoft.Extensions.DependencyInjection
 {
     public static class LightningPaymentsExtensions
     {
