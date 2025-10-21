@@ -41,6 +41,7 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddScoped<IEmailService, SmtpEmailService>();
             builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
             builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
+            builder.Services.AddScoped<IBreezEventProcessor, BreezEventProcessor>();
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>();
 

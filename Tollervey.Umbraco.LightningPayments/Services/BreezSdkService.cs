@@ -1,4 +1,5 @@
 ﻿using Breez.Sdk.Liquid;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -31,16 +32,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         private readonly IAsyncPolicy<ReceivePaymentResponse> _receivePolicy;
 
         private readonly ILoggerFactory _loggerFactory;
-        private readonly IBreezEventProcessor _breezEventProcessor;
+        private readonly IServiceProvider _serviceProvider;
 
-        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper, IBreezEventProcessor breezEventProcessor)
+        public BreezSdkService(IOptions<LightningPaymentsSettings> settings, IHostEnvironment hostEnvironment, ILoggerFactory loggerFactory, ILogger<BreezSdkService> logger, IBreezSdkWrapper wrapper, IServiceProvider serviceProvider)
         {
             _settings = settings.Value;
             _logger = logger;
             _hostEnvironment = hostEnvironment;
             _wrapper = wrapper;
             _loggerFactory = loggerFactory;
-            _breezEventProcessor = breezEventProcessor;
+            _serviceProvider = serviceProvider;
             _sdkInstance = new Lazy<Task<BindingLiquidSdk?>>(() => InitializeSdkAsync(), LazyThreadSafetyMode.ExecutionAndPublication);
 
             // Initialize resiliency policies
@@ -106,7 +107,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
                 ct.ThrowIfCancellationRequested();
                 var sdk = await _connectPolicy.ExecuteAsync((token) => _wrapper.ConnectAsync(connectRequest, token), ct);
-                _eventListener = new SdkEventListener(_breezEventProcessor, _loggerFactory.CreateLogger<SdkEventListener>(), () => _disposed == 1);
+                _eventListener = new SdkEventListener(_serviceProvider, _loggerFactory.CreateLogger<SdkEventListener>(), () => _disposed == 1);
                 _wrapper.AddEventListener(sdk, _eventListener);
                 _logger.LogInformation("Breez SDK connected successfully.");
 
@@ -319,12 +320,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         internal class SdkEventListener : EventListener
         {
             private readonly ILogger<SdkEventListener> _logger;
-            private readonly IBreezEventProcessor _breezEventProcessor;
+            private readonly IServiceProvider _serviceProvider;
             private readonly Func<bool> _isDisposed;
 
-            public SdkEventListener(IBreezEventProcessor breezEventProcessor, ILogger<SdkEventListener> logger, Func<bool> isDisposed)
+            public SdkEventListener(IServiceProvider serviceProvider, ILogger<SdkEventListener> logger, Func<bool> isDisposed)
             {
-                _breezEventProcessor = breezEventProcessor;
+                _serviceProvider = serviceProvider;
                 _logger = logger;
                 _isDisposed = isDisposed;
             }
@@ -341,7 +342,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
                 if (e is SdkEvent.PaymentSucceeded succeeded)
                 {
-                    _ = _breezEventProcessor.EnqueueEvent(succeeded);
+                    using var scope = _serviceProvider.CreateScope();
+                    var breezEventProcessor = scope.ServiceProvider.GetRequiredService<IBreezEventProcessor>();
+                    _ = breezEventProcessor.EnqueueEvent(succeeded);
                 }
             }
         }
