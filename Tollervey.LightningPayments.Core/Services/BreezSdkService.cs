@@ -112,7 +112,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var connectRequest = new ConnectRequest(config, _settings.Mnemonic);
 
                 ct.ThrowIfCancellationRequested();
-                var sdk = await _connectPolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.Connect(connectRequest), token), ct);
+                var sdk = await _connectPolicy.ExecuteAsync((token) => _wrapper.ConnectAsync(connectRequest, token), ct);
                 _eventListener = new SdkEventListener(_breezEventProcessor, _loggerFactory.CreateLogger<SdkEventListener>(), () => _disposed == 1);
                 _wrapper.AddEventListener(sdk, _eventListener);
                 _logger.LogInformation("Breez SDK connected successfully.");
@@ -125,7 +125,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                         // TODO: Implement challenge/verification on the receiver side to confirm the endpoint is valid.
                         await _webhookPolicy.ExecuteAsync(async (token) =>
                         {
-                            await Task.Run(() => _wrapper.RegisterWebhook(sdk, _settings.WebhookUrl), token);
+                            await _wrapper.RegisterWebhookAsync(sdk, _settings.WebhookUrl, token);
                             _webhookRegistered = true;
                         }, ct);
                         // TODO: The webhook receiver should validate incoming requests using HMAC signatures.
@@ -174,14 +174,14 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt11Invoice, optionalAmount);
 
                 ct.ThrowIfCancellationRequested();
-                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest), token), ct);
+                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => _wrapper.PrepareReceivePaymentAsync(sdk, prepareRequest, token), ct);
                 _logger.LogInformation("Breez SDK invoice creation fee: {FeeSat} sats", prepareResponse.feesSat);
                 activity?.SetTag("feesSat", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
 
                 ct.ThrowIfCancellationRequested();
-                var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
+                var res = await _receivePolicy.ExecuteAsync((token) => _wrapper.ReceivePaymentAsync(sdk, req, token), ct);
                 activity?.SetStatus(ActivityStatusCode.Ok);
                 return res.destination;
             }
@@ -215,14 +215,14 @@ namespace Tollervey.LightningPayments.Breez.Services
                 var prepareRequest = new PrepareReceiveRequest(PaymentMethod.Bolt12Offer, optionalAmount);
 
                 ct.ThrowIfCancellationRequested();
-                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.PrepareReceivePayment(sdk, prepareRequest), token), ct);
+                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => _wrapper.PrepareReceivePaymentAsync(sdk, prepareRequest, token), ct);
                 _logger.LogInformation("Breez SDK offer creation fee: {FeeSat} sats", prepareResponse.feesSat);
                 activity?.SetTag("feesSat", prepareResponse.feesSat);
 
                 var req = new ReceivePaymentRequest(prepareResponse, description);
 
                 ct.ThrowIfCancellationRequested();
-                var res = await _receivePolicy.ExecuteAsync((token) => Task.Run(() => _wrapper.ReceivePayment(sdk, req), token), ct);
+                var res = await _receivePolicy.ExecuteAsync((token) => _wrapper.ReceivePaymentAsync(sdk, req, token), ct);
                 activity?.SetStatus(ActivityStatusCode.Ok);
                 return res.destination;
             }
@@ -261,7 +261,7 @@ namespace Tollervey.LightningPayments.Breez.Services
                             // Although the SDK may not support removal, we call it for future-proofing.
                             _wrapper.RemoveEventListener(sdk, _eventListener);
                         }
-                        _wrapper.Disconnect(sdk);
+                        await _wrapper.DisconnectAsync(sdk, _cts.Token);
                     }
                     _logger.LogInformation("Breez SDK disconnected.");
                 }

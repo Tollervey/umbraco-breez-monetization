@@ -92,7 +92,7 @@ public class BreezSdkServiceTests
         _wrapperMock.Setup(w => w.DefaultConfig(LiquidNetwork.Testnet, "test-api-key")).Returns(config);
 
         var sdkMock = new Mock<BindingLiquidSdk>();
-        _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdkMock.Object);
+        _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdkMock.Object);
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -102,9 +102,9 @@ public class BreezSdkServiceTests
 
         Assert.IsNotNull(result);
         _wrapperMock.Verify(w => w.SetLogger(It.IsAny<Logger>()), Times.Once);
-        _wrapperMock.Verify(w => w.Connect(It.IsAny<ConnectRequest>()), Times.Once);
+        _wrapperMock.Verify(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>()), Times.Once);
         _wrapperMock.Verify(w => w.AddEventListener(sdkMock.Object, It.IsAny<EventListener>()), Times.Once);
-        _wrapperMock.Verify(w => w.RegisterWebhook(sdkMock.Object, "https://test-webhook.com"), Times.Once);
+        _wrapperMock.Verify(w => w.RegisterWebhookAsync(sdkMock.Object, "https://test-webhook.com", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [TestMethod]
@@ -131,10 +131,10 @@ public class BreezSdkServiceTests
 
         var payerAmount = new ReceiveAmount.Bitcoin(1000);
         var prepareResponse = new PrepareReceiveResponse(PaymentMethod.Bolt11Invoice, 100, payerAmount, 1000, 10000, 0.1);
-        _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Returns(prepareResponse);
+        _wrapperMock.Setup(w => w.PrepareReceivePaymentAsync(sdkMock.Object, It.IsAny<PrepareReceiveRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(prepareResponse);
 
         var receiveResponse = new ReceivePaymentResponse("bolt11-invoice", null, null);
-        _wrapperMock.Setup(w => w.ReceivePayment(sdkMock.Object, It.IsAny<ReceivePaymentRequest>())).Returns(receiveResponse);
+        _wrapperMock.Setup(w => w.ReceivePaymentAsync(sdkMock.Object, It.IsAny<ReceivePaymentRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(receiveResponse);
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -154,7 +154,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Throws(new Exception("SDK error"));
+        _wrapperMock.Setup(w => w.PrepareReceivePaymentAsync(sdkMock.Object, It.IsAny<PrepareReceiveRequest>(), It.IsAny<CancellationToken>())).Throws(new Exception("SDK error"));
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -173,10 +173,10 @@ public class BreezSdkServiceTests
 
         var payerAmount = new ReceiveAmount.Bitcoin(1000);
         var prepareResponse = new PrepareReceiveResponse(PaymentMethod.Bolt12Offer, 100, payerAmount, 1000, 10000, 0.1);
-        _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Returns(prepareResponse);
+        _wrapperMock.Setup(w => w.PrepareReceivePaymentAsync(sdkMock.Object, It.IsAny<PrepareReceiveRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(prepareResponse);
 
         var receiveResponse = new ReceivePaymentResponse("bolt12-offer", null, null);
-        _wrapperMock.Setup(w => w.ReceivePayment(sdkMock.Object, It.IsAny<ReceivePaymentRequest>())).Returns(receiveResponse);
+        _wrapperMock.Setup(w => w.ReceivePaymentAsync(sdkMock.Object, It.IsAny<ReceivePaymentRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(receiveResponse);
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -202,13 +202,13 @@ public class BreezSdkServiceTests
 
         await service.DisposeAsync();
 
-        _wrapperMock.Verify(w => w.Disconnect(sdkMock.Object), Times.Once);
+        _wrapperMock.Verify(w => w.DisconnectAsync(sdkMock.Object, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [TestMethod]
     public async Task InitializeSdkAsync_HandlesException()
     {
-        _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Throws(new Exception("Connect failed"));
+        _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).Throws(new Exception("Connect failed"));
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -241,7 +241,7 @@ public class BreezSdkServiceTests
         var task = (Task<BindingLiquidSdk?>)method.Invoke(service, new object[] { CancellationToken.None });
         await task;
 
-        _wrapperMock.Verify(w => w.RegisterWebhook(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>()), Times.Never);
+        _wrapperMock.Verify(w => w.RegisterWebhookAsync(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [TestMethod]
@@ -267,7 +267,7 @@ public class BreezSdkServiceTests
         await (Task)method.Invoke(service, new object[] { CancellationToken.None });
 
         // Assert
-        _wrapperMock.Verify(w => w.RegisterWebhook(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>()), Times.Never);
+        _wrapperMock.Verify(w => w.RegisterWebhookAsync(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Warning,
@@ -301,7 +301,7 @@ public class BreezSdkServiceTests
         await (Task)method.Invoke(service, new object[] { CancellationToken.None });
 
         // Assert
-        _wrapperMock.Verify(w => w.RegisterWebhook(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>()), Times.Never);
+        _wrapperMock.Verify(w => w.RegisterWebhookAsync(It.IsAny<BindingLiquidSdk>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Warning,
@@ -327,7 +327,7 @@ public class BreezSdkServiceTests
         await (Task)method.Invoke(service, new object[] { CancellationToken.None }); // Call a second time
 
         // Assert
-        _wrapperMock.Verify(w => w.RegisterWebhook(sdkMock.Object, _settings.WebhookUrl), Times.Once);
+        _wrapperMock.Verify(w => w.RegisterWebhookAsync(sdkMock.Object, _settings.WebhookUrl, It.IsAny<CancellationToken>()), Times.Once);
     }
 
 
@@ -338,7 +338,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        _wrapperMock.Setup(w => w.PrepareReceivePayment(sdkMock.Object, It.IsAny<PrepareReceiveRequest>())).Throws(new Exception("SDK error"));
+        _wrapperMock.Setup(w => w.PrepareReceivePaymentAsync(sdkMock.Object, It.IsAny<PrepareReceiveRequest>(), It.IsAny<CancellationToken>())).Throws(new Exception("SDK error"));
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -380,7 +380,7 @@ public class BreezSdkServiceTests
                 null
             )
         );
-        _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdkMock.Object);
+        _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdkMock.Object);
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -402,7 +402,7 @@ public class BreezSdkServiceTests
 
         await service.DisposeAsync();
 
-        _wrapperMock.Verify(w => w.Disconnect(It.IsAny<BindingLiquidSdk>()), Times.Never);
+        _wrapperMock.Verify(w => w.DisconnectAsync(It.IsAny<BindingLiquidSdk>(), It.IsAny<CancellationToken>()), Times.Never);
         _loggerMock.Verify(l => l.LogInformation("Breez SDK disconnected."), Times.Never);
     }
 
@@ -540,7 +540,7 @@ public class BreezSdkServiceTests
         var sdkMock = new Mock<BindingLiquidSdk>();
         SetupSdkInitialization(sdkMock.Object);
 
-        _wrapperMock.Setup(w => w.Disconnect(sdkMock.Object)).Throws(new Exception("Disconnect failed"));
+        _wrapperMock.Setup(w => w.DisconnectAsync(sdkMock.Object, It.IsAny<CancellationToken>())).Throws(new Exception("Disconnect failed"));
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -559,8 +559,8 @@ public class BreezSdkServiceTests
         _wrapperMock.Setup(w => w.DefaultConfig(LiquidNetwork.Testnet, "test-api-key")).Returns(config);
 
         var sdkMock = new Mock<BindingLiquidSdk>();
-        _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdkMock.Object);
-        _wrapperMock.Setup(w => w.RegisterWebhook(sdkMock.Object, It.IsAny<string>())).Throws(new Exception("Webhook registration failed"));
+        _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdkMock.Object);
+        _wrapperMock.Setup(w => w.RegisterWebhookAsync(sdkMock.Object, It.IsAny<string>(), It.IsAny<CancellationToken>())).Throws(new Exception("Webhook registration failed"));
 
         var service = new BreezSdkService(_settingsMock.Object, _hostEnvironmentMock.Object, _loggerFactoryMock.Object, _scopeFactoryMock.Object, _loggerMock.Object, _wrapperMock.Object, _breezEventProcessorMock.Object);
 
@@ -587,7 +587,7 @@ public class BreezSdkServiceTests
         await Task.WhenAll(tasks);
 
         // Assert
-        _wrapperMock.Verify(w => w.Connect(It.IsAny<ConnectRequest>()), Times.Once);
+        _wrapperMock.Verify(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>()), Times.Once);
         foreach (var task in tasks)
         {
             Assert.IsNotNull(await task);
@@ -737,6 +737,6 @@ public class BreezSdkServiceTests
     {
         var config = new Config(new BlockchainExplorer(), new BlockchainExplorer(), "test-path", LiquidNetwork.Testnet, 3600UL, null, null, null, false, false, null, null, null, null);
         _wrapperMock.Setup(w => w.DefaultConfig(LiquidNetwork.Testnet, "test-api-key")).Returns(config);
-        _wrapperMock.Setup(w => w.Connect(It.IsAny<ConnectRequest>())).Returns(sdk);
+        _wrapperMock.Setup(w => w.ConnectAsync(It.IsAny<ConnectRequest>(), It.IsAny<CancellationToken>())).ReturnsAsync(sdk);
     }
 }
