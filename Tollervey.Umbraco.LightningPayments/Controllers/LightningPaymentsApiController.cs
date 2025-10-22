@@ -20,6 +20,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
     [RequireHttps]
     [Authorize(Policy = AuthorizationPolicies.RequireAdminAccess)]
+    [Route("api/lightningpayments")]
     public class LightningPaymentsApiController : ManagementApiControllerBase
     {
         private readonly IBreezSdkService _breezSdkService;
@@ -47,7 +48,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// </summary>
         /// <param name="contentId">The ID of the Umbraco content item requiring payment.</param>
         /// <returns>A JSON object containing the invoice and payment hash, or an error response.</returns>
-        [HttpGet]
+        [HttpGet("GetPaywallInvoice")]
         public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
         {
             if (contentId <= 0)
@@ -131,7 +132,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// </summary>
         /// <param name="contentId">The ID of the Umbraco content item.</param>
         /// <returns>JSON object with LNURL-Pay details.</returns>
-        [HttpGet]
+        [HttpGet("GetLnurlPayInfo")]
         public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
         {
             return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextAccessor, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
@@ -143,7 +144,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// <param name="amount">Amount in millisatoshis.</param>
         /// <param name="contentId">The ID of the Umbraco content item.</param>
         /// <returns>JSON object with the payment request (pr).</returns>
-        [HttpGet]
+        [HttpGet("GetLnurlInvoice")]
         public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId)
         {
             if (contentId <= 0)
@@ -209,7 +210,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// <summary>
         /// Gets the Bolt12 offer for a specific content item.
         /// </summary>
-        [HttpGet]
+        [HttpGet("GetBolt12Offer")]
         public async Task<IActionResult> GetBolt12Offer([FromQuery] int contentId)
         {
             if (contentId <= 0)
