@@ -55,7 +55,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     PreRouting = app => app.UseMiddleware<ExceptionHandlingMiddleware>()
                 });
 
-                // Add Authorization middleware
+                    // Add Authorization middleware
                 options.AddFilter(new UmbracoPipelineFilter(
                     "LightningPayments_Authorization",
                     applicationBuilder =>
