@@ -1,4 +1,3 @@
-using BTCPayServer.Lightning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -81,7 +80,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
                 var invoice = await _breezSdkService.CreateInvoiceAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
 
-                if (!TryGetPaymentHash(invoice, out var paymentHash))
+                var paymentHash = await TryGetPaymentHash(invoice);
+                if (string.IsNullOrWhiteSpace(paymentHash))
                 {
                     return BadRequest("Failed to obtain invoice payment hash.");
                 }
@@ -185,7 +185,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 string description = $"Access to {content.Name} (ID: {contentId})";
                 var invoice = await _breezSdkService.CreateInvoiceAsync(sats, description);
 
-                if (!TryGetPaymentHash(invoice, out var paymentHash))
+                var paymentHash = await TryGetPaymentHash(invoice);
+                if (string.IsNullOrWhiteSpace(paymentHash))
                 {
                     return BadRequest("Failed to obtain invoice payment hash.");
                 }
@@ -268,22 +269,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             return (content, paywallConfig);
         }
 
-        private bool TryGetPaymentHash(string invoice, out string? paymentHash)
+        // Common async helper to extract the payment hash using Breez parse with offline fallback
+        private async Task<string?> TryGetPaymentHash(string invoice)
         {
-            paymentHash = null;
-
-            try
+            var hash = await _breezSdkService.TryExtractPaymentHashAsync(invoice);
+            if (!string.IsNullOrWhiteSpace(hash))
             {
-                var bolt11 = BOLT11PaymentRequest.Parse(invoice, NBitcoin.Network.Main);
-                if (bolt11?.PaymentHash != null)
-                {
-                    paymentHash = bolt11.PaymentHash.ToString();
-                    return true;
-                }
-            }
-            catch
-            {
-                // fall through to offline parsing
+                return hash.ToLowerInvariant();
             }
 
             if (_runtimeMode.IsOffline)
@@ -291,12 +283,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 var m = OfflineHashRegex.Match(invoice);
                 if (m.Success)
                 {
-                    paymentHash = m.Groups[1].Value.ToLowerInvariant();
-                    return true;
+                    return m.Groups[1].Value.ToLowerInvariant();
                 }
             }
 
-            return false;
+            return null;
         }
     }
 }

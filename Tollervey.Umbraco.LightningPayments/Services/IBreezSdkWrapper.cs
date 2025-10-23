@@ -13,5 +13,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         Task DisconnectAsync(BindingLiquidSdk sdk, CancellationToken ct = default);
         void AddEventListener(BindingLiquidSdk sdk, EventListener listener);
         void RemoveEventListener(BindingLiquidSdk sdk, EventListener listener);
+        Task<InputType> ParseAsync(BindingLiquidSdk sdk, string input, CancellationToken ct = default);
     }
 }

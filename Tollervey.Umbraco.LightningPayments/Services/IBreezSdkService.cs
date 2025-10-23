@@ -5,5 +5,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default);
         Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default);
         Task<bool> IsConnectedAsync(CancellationToken ct = default);
+        Task<string?> TryExtractPaymentHashAsync(string invoice, CancellationToken ct = default);
     }
 }

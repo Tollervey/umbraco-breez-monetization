@@ -31,5 +31,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             // This is a placeholder for when/if it becomes available.
             // sdk.RemoveEventListener(listener);
         }
+
+        // New: parse inputs using Breez SDK
+        public Task<InputType> ParseAsync(BindingLiquidSdk sdk, string input, CancellationToken ct = default)
+        => Task.Run(() => sdk.Parse(input), ct);
     }
 }

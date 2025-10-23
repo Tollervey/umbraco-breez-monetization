@@ -72,6 +72,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             return Task.FromResult(invoice);
         }
 
+        // New: offline implementation returns null; controller will use its regex fallback in offline mode.
+        public Task<string?> TryExtractPaymentHashAsync(string invoice, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
+
         public ValueTask DisposeAsync()
         {
             _cts.Cancel();

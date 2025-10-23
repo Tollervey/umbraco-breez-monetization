@@ -203,6 +203,35 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             return sdk != null;
         }
 
+        // New: Try to extract payment hash using Breez parse
+        public async Task<string?> TryExtractPaymentHashAsync(string invoice, CancellationToken ct = default)
+        {
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
+            if (sdk == null)
+            {
+                _logger.LogWarning("Breez SDK not connected; cannot parse invoice.");
+                return null;
+            }
+
+            try
+            {
+                var parsed = await _wrapper.ParseAsync(sdk, invoice, ct);
+                if (parsed is InputType.Bolt11 bolt11)
+                {
+                    // The Breez C# binding exposes `invoice` with fields like `paymentHash` (hex string)
+                    var hash = bolt11.invoice.paymentHash;
+                    return string.IsNullOrWhiteSpace(hash) ? null : hash.ToLowerInvariant();
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse invoice using Breez SDK.");
+                return null;
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0)
