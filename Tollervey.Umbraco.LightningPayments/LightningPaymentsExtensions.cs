@@ -47,23 +47,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
-            // Register middleware
-            builder.Services.Configure<UmbracoPipelineOptions>(options =>
-            {
-                options.AddFilter(new UmbracoPipelineFilter(nameof(ExceptionHandlingMiddleware))
-                {
-                    PreRouting = app => app.UseMiddleware<ExceptionHandlingMiddleware>()
-                });
-
-                options.AddFilter(new UmbracoPipelineFilter(nameof(PaywallMiddleware))
-                {
-                    PostRouting = app => app.UseMiddleware<PaywallMiddleware>()
-                });
-                options.AddFilter(new UmbracoPipelineFilter("HealthChecks")
-                {
-                    PostRouting = app => app.UseEndpoints(endpoints => endpoints.MapHealthChecks("/health/ready"))
-                });
-            });
+            // Middleware and endpoint registration moved to Composer to ensure correct Umbraco pipeline ordering.
 
             return builder;
         }

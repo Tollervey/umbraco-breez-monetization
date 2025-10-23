@@ -29,4 +29,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
         public InvoiceException(string message) : base(message) { }
         public InvoiceException(string message, Exception innerException) : base(message, innerException) { }
     }
+
+    /// <summary>
+    /// Exception thrown for invoice request-related errors.
+    /// </summary>
+    public class InvalidInvoiceRequestException : Exception
+    {
+        public InvalidInvoiceRequestException()
+        {
+        }
+
+        public InvalidInvoiceRequestException(string message) : base(message)
+        {
+        }
+
+        public InvalidInvoiceRequestException(string message, Exception innerException) : base(message, innerException)
+        {
+        }
+    }
 }
