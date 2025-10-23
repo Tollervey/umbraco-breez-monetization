@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
+using Tollervey.Umbraco.LightningPayments.UI.Models;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
