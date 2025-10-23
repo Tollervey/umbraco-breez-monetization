@@ -9,6 +9,7 @@ using Tollervey.Umbraco.LightningPayments.UI;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
+using Tollervey.Umbraco.LightningPayments.UI.Components;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 {
@@ -18,6 +19,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
         {
             // Register services, options, health checks, etc.
             builder.AddLightningPayments();
+
+            // Ensure BreezSdkService is tied to Umbraco app lifecycle
+            builder.Components().Append<BreezSdkComponent>();
 
             // Register middleware using Umbraco pipeline filters (applies to both pipelines in v16).
             builder.Services.Configure<UmbracoPipelineOptions>(options =>
