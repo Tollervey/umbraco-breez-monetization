@@ -21,6 +21,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
             builder.Services.AddSingleton<IValidateOptions<LightningPaymentsSettings>, LightningPaymentsSettingsValidator>();
 
+            // Default runtime mode marker (online by default)
+            builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: false));
+
             // Add Application Insights if connection string is provided
             var aiConnectionString = builder.Config.GetSection(LightningPaymentsSettings.SectionName)["ApplicationInsightsConnectionString"];
             if (!string.IsNullOrEmpty(aiConnectionString))
@@ -48,6 +51,31 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
             // Middleware and endpoint registration moved to Composer to ensure correct Umbraco pipeline ordering.
+
+            return builder;
+        }
+
+        /// <summary>
+        /// Enables offline mode: no calls to Breez SDK are made. 
+        /// A mocked service returns synthetic invoices and simulates confirmations.
+        /// </summary>
+        public static IUmbracoBuilder UseLightningPaymentsOffline(this IUmbracoBuilder builder, Action<OfflineLightningPaymentsOptions>? configure = null)
+        {
+            var options = new OfflineLightningPaymentsOptions();
+            configure?.Invoke(options);
+
+            // Replace the runtime mode marker
+            builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: true));
+            builder.Services.AddSingleton<IOptions<OfflineLightningPaymentsOptions>>(_ => Microsoft.Extensions.Options.Options.Create(options));
+
+            // Replace the SDK service with the offline implementation
+            builder.Services.AddSingleton<IBreezSdkService, OfflineBreezSdkService>();
+
+            // Optionally replace persistent payment state with in-memory state to avoid touching storage
+            if (options.UseInMemoryStateService)
+            {
+                builder.Services.AddScoped<IPaymentStateService, InMemoryPaymentStateService>();
+            }
 
             return builder;
         }
