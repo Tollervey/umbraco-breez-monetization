@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Tollervey.Umbraco.LightningPayments.UI.Services;
@@ -28,19 +30,24 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         private readonly IUmbracoContextAccessor _umbracoContextAccessor;
         private readonly ILogger<LightningPaymentsApiController> _logger;
         private readonly IUserService _userService;
+        private readonly ILightningPaymentsRuntimeMode _runtimeMode;
+
+        private static readonly Regex OfflineHashRegex = new(@"(?:^|-)p=([0-9a-f]{64})(?:-|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public LightningPaymentsApiController(
         IBreezSdkService breezSdkService,
         IPaymentStateService paymentStateService,
         IUmbracoContextAccessor umbracoContextAccessor,
         ILogger<LightningPaymentsApiController> logger,
-        IUserService userService)
+        IUserService userService,
+        ILightningPaymentsRuntimeMode runtimeMode)
         {
             _breezSdkService = breezSdkService;
             _paymentStateService = paymentStateService;
             _umbracoContextAccessor = umbracoContextAccessor;
             _logger = logger;
             _userService = userService;
+            _runtimeMode = runtimeMode;
         }
 
         /// <summary>
@@ -74,19 +81,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
                 var invoice = await _breezSdkService.CreateInvoiceAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
 
-                var bolt11 = BOLT11PaymentRequest.Parse(invoice, NBitcoin.Network.Main);
-                if (bolt11?.PaymentHash == null)
+                if (!TryGetPaymentHash(invoice, out var paymentHash))
                 {
-                    return BadRequest("Failed to parse invoice payment hash.");
+                    return BadRequest("Failed to obtain invoice payment hash.");
                 }
-                var paymentHash = bolt11.PaymentHash.ToString();
 
                 var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ??
                                 Guid.NewGuid().ToString();
                 Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions
                 { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
 
-                await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
+                await _paymentStateService.AddPendingPaymentAsync(paymentHash!, contentId, sessionId);
 
                 return Ok(new { invoice, paymentHash });
             }
@@ -180,12 +185,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 string description = $"Access to {content.Name} (ID: {contentId})";
                 var invoice = await _breezSdkService.CreateInvoiceAsync(sats, description);
 
-                var bolt11 = BOLT11PaymentRequest.Parse(invoice, NBitcoin.Network.Main);
-                if (bolt11?.PaymentHash == null)
+                if (!TryGetPaymentHash(invoice, out var paymentHash))
                 {
-                    return BadRequest("Failed to parse invoice payment hash.");
+                    return BadRequest("Failed to obtain invoice payment hash.");
                 }
-                var paymentHash = bolt11.PaymentHash.ToString();
 
                 var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ??
                                 Guid.NewGuid().ToString();
@@ -196,7 +199,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                     SameSite = SameSiteMode.Strict
                 });
 
-                await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
+                await _paymentStateService.AddPendingPaymentAsync(paymentHash!, contentId, sessionId);
 
                 return Ok(new { pr = invoice });
             }
@@ -263,6 +266,37 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             var paywallConfig = JsonSerializer.Deserialize<PaywallConfig>(paywallJson ?? "{}", options);
 
             return (content, paywallConfig);
+        }
+
+        private bool TryGetPaymentHash(string invoice, out string? paymentHash)
+        {
+            paymentHash = null;
+
+            try
+            {
+                var bolt11 = BOLT11PaymentRequest.Parse(invoice, NBitcoin.Network.Main);
+                if (bolt11?.PaymentHash != null)
+                {
+                    paymentHash = bolt11.PaymentHash.ToString();
+                    return true;
+                }
+            }
+            catch
+            {
+                // fall through to offline parsing
+            }
+
+            if (_runtimeMode.IsOffline)
+            {
+                var m = OfflineHashRegex.Match(invoice);
+                if (m.Success)
+                {
+                    paymentHash = m.Groups[1].Value.ToLowerInvariant();
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
