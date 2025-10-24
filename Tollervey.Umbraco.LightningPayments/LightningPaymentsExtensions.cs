@@ -44,6 +44,8 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddScoped<IEmailService, SmtpEmailService>();
             builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
             builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
+            builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
+            builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
             builder.Services.AddSingleton<BreezEventProcessor>();
             builder.Services.AddSingleton<IBreezEventProcessor>(sp => sp.GetRequiredService<BreezEventProcessor>());
             builder.Services.AddHostedService(sp => sp.GetRequiredService<BreezEventProcessor>());
@@ -72,6 +74,8 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Replace the SDK service with the offline implementation
             builder.Services.AddSingleton<IBreezSdkService, OfflineBreezSdkService>();
+            builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
+            builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
 
             // Optionally replace persistent payment state with in-memory state to avoid touching storage
             if (options.UseInMemoryStateService)

@@ -31,7 +31,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
     /// - If a Webhook URL is configured, it is registered on connect to enable offline receiving flows required
     /// for LNURL-Pay in the Liquid implementation (see the Receive guidelines).
     /// </summary>
-    public class BreezSdkService : IBreezSdkService, IAsyncDisposable
+    public class BreezSdkService : IBreezSdkService, IBreezSdkHandleProvider, IAsyncDisposable
     {
         private static readonly ActivitySource _activity = new("BreezSdkService");
         private readonly ILogger<BreezSdkService> _logger;
@@ -217,6 +217,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 throw new InvoiceException($"Failed to create {paymentType} via Breez SDK.", ex);
             }
+        }
+
+        /// <summary>
+        /// Provides the connected SDK instance for internal/advanced operations via a facade.
+        /// Not intended to be called directly by UI; prefer <see cref="IBreezPaymentsFacade"/>.
+        /// </summary>
+        public async Task<BindingLiquidSdk?> GetSdkAsync(CancellationToken ct = default)
+        {
+            return await _sdkInstance.Value.WaitAsync(ct);
         }
 
         /// <summary>
