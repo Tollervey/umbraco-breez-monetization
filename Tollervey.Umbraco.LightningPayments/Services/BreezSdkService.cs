@@ -12,6 +12,25 @@ using Tollervey.Umbraco.LightningPayments.UI.Models;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
+    /// <summary>
+    /// Breez SDK integration service used by Umbraco controllers/components.
+    /// Implements the receive-side flows and event wiring recommended by the Breez UX Guidelines.
+    ///
+    /// UX references:
+    /// - Overall: https://sdk-doc-liquid.breez.technology/guide/uxguide.html
+    /// - Receive: https://sdk-doc-liquid.breez.technology/guide/uxguide_receive.html
+    /// - Display: https://sdk-doc-liquid.breez.technology/guide/uxguide_display.html
+    /// - Seed/Key mgmt: https://sdk-doc-liquid.breez.technology/guide/uxguide_seed.html
+    ///
+    /// Notes for Umbraco UI implementers:
+    /// - This service exposes high-level methods to create Lightning payment requests (BOLT11/BOLT12) and
+    /// to look up payments by hash for display/history.
+    /// - It also subscribes to SDK events and forwards them to an <see cref="IBreezEventProcessor"/> that you can
+    /// implement to update your UI state (e.g., Pending → Succeeded/Failed), matching the UX guideline on
+    /// interacting with SDK events.
+    /// - If a Webhook URL is configured, it is registered on connect to enable offline receiving flows required
+    /// for LNURL-Pay in the Liquid implementation (see the Receive guidelines).
+    /// </summary>
     public class BreezSdkService : IBreezSdkService, IAsyncDisposable
     {
         private static readonly ActivitySource _activity = new("BreezSdkService");
@@ -200,23 +219,62 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <summary>
+        /// Creates a Lightning payment request using the BOLT11 standard (one-off invoice with amount and optional description).
+        ///
+        /// UI guidance (Receive UX):
+        /// - Prefer LNURL-Pay as the default reusable identifier in your UI and fall back to BOLT11 for a specified amount
+        /// request when needed. This method covers that one-off flow.
+        /// - Before showing the confirmation screen, display limits/fees to the user. This service pre-checks Lightning
+        /// receive limits and will throw if outside the min/max. You can also surface limits to the UI using the wrapper
+        /// (see <see cref="IBreezSdkWrapper.FetchLightningLimitsAsync"/>).
+        /// - Show a QR and a Copy/Share affordance in the UI (copy the BOLT11 string, share payload as needed).
+        ///
+        /// References:
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_receive.html
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_display.html
+        /// </summary>
         public Task<string> CreateInvoiceAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
             return CreatePaymentAsync(amountSat, description, PaymentMethod.Bolt11Invoice, "invoice", ct);
         }
 
+        /// <summary>
+        /// Creates a Lightning payment request using BOLT12 offer (Liquid implementation only).
+        ///
+        /// UI guidance (Receive UX):
+        /// - If you support BOLT12, surface the same Lightning address and enhance with BIP-353 as recommended.
+        /// - Treat the returned string as a share/copy target, similar to BOLT11; ensure limits/fees are displayed.
+        ///
+        /// References:
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_receive.html
+        /// </summary>
         public Task<string> CreateBolt12OfferAsync(ulong amountSat, string description, CancellationToken ct = default)
         {
             return CreatePaymentAsync(amountSat, description, PaymentMethod.Bolt12Offer, "Bolt12 offer", ct);
         }
 
+        /// <summary>
+        /// Indicates whether the underlying Breez SDK is connected and ready.
+        /// Use to gate UI features that require a connected wallet.
+        /// </summary>
         public async Task<bool> IsConnectedAsync(CancellationToken ct = default)
         {
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
             return sdk != null;
         }
 
-        // New: Try to extract payment hash using Breez parse
+        /// <summary>
+        /// Attempts to parse a BOLT11 invoice to extract its payment hash using the SDK's <c>parse</c> facility.
+        ///
+        /// UI guidance (Display UX):
+        /// - Use the payment hash to correlate local UI state with on-chain/Lightning payment entities.
+        /// - When available, show technical metadata (invoice string, preimage) under a collapsible Details section.
+        ///
+        /// References:
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_display.html
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_send.html (Unified parser for pasted/scanned input)
+        /// </summary>
         public async Task<string?> TryExtractPaymentHashAsync(string invoice, CancellationToken ct = default)
         {
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
@@ -245,7 +303,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
-        // New: Admin/reconciliation helper to fetch a payment by its Lightning payment hash
+        /// <summary>
+        /// Retrieves a single payment by its Lightning payment hash.
+        ///
+        /// UI guidance (Display UX):
+        /// - Use this to populate a payment details screen. Display amount and fees separately, and expose invoice/preimage
+        /// in a Details section. Represent current state (Pending/Succeeded/Failed) with distinct visuals.
+        ///
+        /// References:
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_display.html
+        /// </summary>
         public async Task<Payment?> GetPaymentByHashAsync(string paymentHash, CancellationToken ct = default)
         {
             var sdk = await _sdkInstance.Value.WaitAsync(ct);
@@ -257,6 +324,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             return await _wrapper.GetPaymentAsync(sdk, req, ct);
         }
 
+        /// <summary>
+        /// Disconnects and releases SDK resources. Called by Umbraco on app shutdown.
+        /// Also removes the SDK event listener if supported by the underlying SDK.
+        /// </summary>
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -371,6 +442,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
         }
 
+        /// <summary>
+        /// Listens to Breez SDK events and forwards them to <see cref="IBreezEventProcessor"/>.
+        ///
+        /// UI guidance:
+        /// - Use these events to drive user-visible state transitions as recommended by the Send/Receive guidelines
+        /// (e.g., show progress/pending, then success/failure with details). Keep technical details under an expandable
+        /// section for power users.
+        ///
+        /// References:
+        /// - Receive events: https://sdk-doc-liquid.breez.technology/guide/receive_payment.html#lightning-1
+        /// - Send events: https://sdk-doc-liquid.breez.technology/guide/send_payment.html#lightning-1
+        /// </summary>
         internal class SdkEventListener : EventListener
         {
             private readonly ILogger<SdkEventListener> _logger;
