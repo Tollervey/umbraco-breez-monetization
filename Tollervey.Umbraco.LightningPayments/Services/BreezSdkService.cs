@@ -165,6 +165,19 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
             try
             {
+                // Pre-check lightning receive limits for bolt11/bolt12
+                if (paymentMethod is PaymentMethod.Bolt11Invoice or PaymentMethod.Bolt12Offer)
+                {
+                    var limits = await _wrapper.FetchLightningLimitsAsync(sdk, ct);
+                    var min = limits.receive.minSat;
+                    var max = limits.receive.maxSat;
+                    if (amountSat < (ulong)min || amountSat > (ulong)max)
+                    {
+                        _logger.LogWarning("Requested amount {Amount} outside lightning receive limits [{Min}, {Max}]", amountSat, min, max);
+                        throw new InvalidInvoiceRequestException($"Amount must be between {min} and {max} sats.");
+                    }
+                }
+
                 var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
                 var prepareRequest = new PrepareReceiveRequest(paymentMethod, optionalAmount);
 
@@ -230,6 +243,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 _logger.LogWarning(ex, "Failed to parse invoice using Breez SDK.");
                 return null;
             }
+        }
+
+        // New: Admin/reconciliation helper to fetch a payment by its Lightning payment hash
+        public async Task<Payment?> GetPaymentByHashAsync(string paymentHash, CancellationToken ct = default)
+        {
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
+            if (sdk == null)
+            {
+                throw new InvalidOperationException("Breez SDK is not connected.");
+            }
+            var req = new GetPaymentRequest.PaymentHash(paymentHash);
+            return await _wrapper.GetPaymentAsync(sdk, req, ct);
         }
 
         public async ValueTask DisposeAsync()
