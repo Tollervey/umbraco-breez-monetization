@@ -249,6 +249,40 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             }
         }
 
+        /// <summary>
+        /// Returns a fee quote (in sats) for receiving the paywall amount for a content item.
+        /// </summary>
+        [HttpGet("GetPaywallReceiveFeeQuote")]
+        public async Task<IActionResult> GetPaywallReceiveFeeQuote([FromQuery] int contentId, [FromQuery] bool bolt12 = false)
+        {
+            if (contentId <= 0)
+            {
+                return BadRequest("Invalid content ID.");
+            }
+
+            try
+            {
+                var (_, paywallConfig) = GetContentAndPaywallConfig(contentId);
+                if (paywallConfig == null || !paywallConfig.Enabled || paywallConfig.Fee == 0)
+                {
+                    return BadRequest("Paywall is not enabled or fee is not set.");
+                }
+
+                var feesSat = await _breezSdkService.GetReceiveFeeQuoteAsync(paywallConfig.Fee, bolt12);
+                return Ok(new { amountSat = paywallConfig.Fee, feesSat, method = bolt12 ? "bolt12" : "bolt11" });
+            }
+            catch (InvalidInvoiceRequestException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for fee quote.");
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching receive fee quote for contentId {ContentId}", contentId);
+                return StatusCode(500, "An error occurred while fetching the fee quote.");
+            }
+        }
+
         private (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId)
         {
             using var cref = _umbracoContextFactory.EnsureUmbracoContext();

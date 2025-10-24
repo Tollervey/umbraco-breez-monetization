@@ -22,7 +22,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly CancellationTokenSource _cts = new();
 
-        private static readonly Regex DescriptionAllowed = new(@"^[\w\s.,'?!@#$%^&*()_+\-_=\[\]{}|;:]*$", RegexOptions.Compiled);
+        private static readonly Regex DescriptionAllowed = new(@"^[\w\s.,'?!@#$%^&*()_+\-_\=\[\]{}|;:]*$", RegexOptions.Compiled);
 
         public OfflineBreezSdkService(
             IOptions<LightningPaymentsSettings> settings,
@@ -72,6 +72,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
             return Task.FromResult(invoice);
         }
+
+        // New: quote expected fees for receiving a payment before creating an invoice/offer (offline ->0)
+        public Task<long> GetReceiveFeeQuoteAsync(ulong amountSat, bool bolt12 = false, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        // New: expose recommended on-chain fees (offline -> null)
+        public Task<Breez.Sdk.Liquid.RecommendedFees?> GetRecommendedFeesAsync(CancellationToken ct = default)
+            => Task.FromResult<Breez.Sdk.Liquid.RecommendedFees?>(null);
 
         // New: offline implementation returns null; controller will use its regex fallback in offline mode.
         public Task<string?> TryExtractPaymentHashAsync(string invoice, CancellationToken ct = default)

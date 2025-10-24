@@ -334,6 +334,58 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         }
 
         /// <summary>
+        /// Fetches a quote for the fees required to receive a payment of the specified amount.
+        /// Uses the existing prepare policy to estimate the fees without creating a payment request.
+        /// </summary>
+        public async Task<long> GetReceiveFeeQuoteAsync(ulong amountSat, bool bolt12 = false, CancellationToken ct = default)
+        {
+            ValidateInvoiceAmount(amountSat);
+
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
+            if (sdk == null)
+            {
+                throw new InvalidOperationException("Breez SDK is not connected.");
+            }
+
+            try
+            {
+                var method = bolt12 ? PaymentMethod.Bolt12Offer : PaymentMethod.Bolt11Invoice;
+                var optionalAmount = new ReceiveAmount.Bitcoin(amountSat);
+                var prepareRequest = new PrepareReceiveRequest(method, optionalAmount);
+                var prepareResponse = await _preparePolicy.ExecuteAsync((token) => _wrapper.PrepareReceivePaymentAsync(sdk, prepareRequest, token), ct);
+                _logger.LogDebug("Receive fee quote for {Method}: {FeeSat} sats", bolt12 ? "BOLT12" : "BOLT11", prepareResponse.feesSat);
+                return (long)prepareResponse.feesSat;
+            }
+            catch (Exception ex)
+            {
+                throw new InvoiceException("Failed to quote receive fees via Breez SDK.", ex);
+            }
+        }
+
+        /// <summary>
+        /// Retrieves recommended on-chain fees from the Breez SDK.
+        /// It is a lightweight call that does not require a connected SDK instance.
+        /// </summary>
+        public async Task<RecommendedFees?> GetRecommendedFeesAsync(CancellationToken ct = default)
+        {
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
+            if (sdk == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return await _wrapper.RecommendedFeesAsync(sdk, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to fetch recommended on-chain fees.");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Disconnects and releases SDK resources. Called by Umbraco on app shutdown.
         /// Also removes the SDK event listener if supported by the underlying SDK.
         /// </summary>
