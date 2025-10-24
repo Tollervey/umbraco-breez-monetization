@@ -26,7 +26,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     {
         private readonly IBreezSdkService _breezSdkService;
         private readonly IPaymentStateService _paymentStateService;
-        private readonly IUmbracoContextAccessor _umbracoContextAccessor;
+        private readonly IUmbracoContextFactory _umbracoContextFactory;
         private readonly ILogger<LightningPaymentsApiController> _logger;
         private readonly IUserService _userService;
         private readonly ILightningPaymentsRuntimeMode _runtimeMode;
@@ -36,14 +36,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         public LightningPaymentsApiController(
         IBreezSdkService breezSdkService,
         IPaymentStateService paymentStateService,
-        IUmbracoContextAccessor umbracoContextAccessor,
+        IUmbracoContextFactory umbracoContextFactory,
         ILogger<LightningPaymentsApiController> logger,
         IUserService userService,
         ILightningPaymentsRuntimeMode runtimeMode)
         {
             _breezSdkService = breezSdkService;
             _paymentStateService = paymentStateService;
-            _umbracoContextAccessor = umbracoContextAccessor;
+            _umbracoContextFactory = umbracoContextFactory;
             _logger = logger;
             _userService = userService;
             _runtimeMode = runtimeMode;
@@ -140,7 +140,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [HttpGet("GetLnurlPayInfo")]
         public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
         {
-            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextAccessor, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
+            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
         }
 
         /// <summary>
@@ -251,7 +251,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
         private (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId)
         {
-            if (!_umbracoContextAccessor.TryGetUmbracoContext(out var umbracoContext))
+            using var cref = _umbracoContextFactory.EnsureUmbracoContext();
+            var umbracoContext = cref.UmbracoContext;
+            if (umbracoContext == null)
             {
                 return (null, null);
             }

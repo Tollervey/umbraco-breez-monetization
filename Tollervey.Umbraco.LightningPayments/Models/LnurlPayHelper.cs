@@ -9,7 +9,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
 {
     public static class LnurlPayHelper
     {
-        public static IActionResult GetLnurlPayInfo(int contentId, IUmbracoContextAccessor umbracoContextAccessor, ILogger logger, HttpRequest request, string callbackPath)
+        public static IActionResult GetLnurlPayInfo(int contentId, IUmbracoContextFactory umbracoContextFactory, ILogger logger, HttpRequest request, string callbackPath)
         {
             if (contentId <= 0)
             {
@@ -18,7 +18,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
 
             try
             {
-                if (!umbracoContextAccessor.TryGetUmbracoContext(out var umbracoContext))
+                using var cref = umbracoContextFactory.EnsureUmbracoContext();
+                var umbracoContext = cref.UmbracoContext;
+                if (umbracoContext == null)
                 {
                     return new BadRequestObjectResult("Could not get Umbraco context.");
                 }
@@ -38,7 +40,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
                 }
 
                 var callback = $"{request.Scheme}://{request.Host}{callbackPath}?contentId={contentId}";
-                var metadata = $"""[["text/plain","Access to {content.Name}"]]""";
+                var metadata = $"""[[\"text/plain\",\"Access to {content.Name}\"]]""";
                 ulong minSendable = paywallConfig.Fee * 1000UL;
                 ulong maxSendable = minSendable;
 

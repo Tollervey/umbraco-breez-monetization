@@ -9,14 +9,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     [RequireHttps]
     public class WellKnownController : UmbracoApiControllerBase
     {
-        private readonly IUmbracoContextAccessor _umbracoContextAccessor;
+        private readonly IUmbracoContextFactory _umbracoContextFactory;
         private readonly ILogger<WellKnownController> _logger;
 
         public WellKnownController(
-            IUmbracoContextAccessor umbracoContextAccessor,
+            IUmbracoContextFactory umbracoContextFactory,
             ILogger<WellKnownController> logger)
         {
-            _umbracoContextAccessor = umbracoContextAccessor;
+            _umbracoContextFactory = umbracoContextFactory;
             _logger = logger;
         }
 
@@ -24,7 +24,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         public IActionResult GetLightningAddress(string name, [FromQuery] int contentId)
         {
             // Ignore name for now
-            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextAccessor, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
+            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
         }
     }
 }
