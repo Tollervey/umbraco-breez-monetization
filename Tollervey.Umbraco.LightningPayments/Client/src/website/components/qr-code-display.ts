@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import QRCode from 'qrcode';
+import * as QRCode from 'qrcode';
 
 @customElement('breez-qr-code-display')
 export class BreezQrCodeDisplay extends LitElement {
@@ -16,7 +16,7 @@ export class BreezQrCodeDisplay extends LitElement {
  private async _renderQr() {
  const canvas = this.renderRoot?.querySelector('canvas');
  if (!canvas || !this.data) return;
- await QRCode.toCanvas(canvas, this.data, { width: this.size, margin:1 });
+ await QRCode.toCanvas(canvas as HTMLCanvasElement, this.data, { width: this.size, margin:1 });
  }
 
  render() {

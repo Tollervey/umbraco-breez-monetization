@@ -22,6 +22,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     [RequireHttps]
     [Authorize(Policy = AuthorizationPolicies.RequireAdminAccess)]
     [Route("api/lightningpayments")]
+    [Produces("application/json")]
     public class LightningPaymentsApiController : ManagementApiControllerBase
     {
         private readonly IBreezSdkService _breezSdkService;
@@ -33,6 +34,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         private readonly IBreezPaymentsFacade _paymentsFacade;
 
         private static readonly Regex OfflineHashRegex = new(@"(?:^|-)p=([0-9a-f]{64})(?:-|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        private IActionResult Error(int statusCode, string error, string message)
+         => StatusCode(statusCode, new ApiError { error = error, message = message });
 
         public LightningPaymentsApiController(
         IBreezSdkService breezSdkService,
@@ -56,6 +60,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Gets the connection status of the Breez SDK.
         /// </summary>
         [HttpGet("GetStatus")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetStatus()
         {
             var connected = await _breezSdkService.IsConnectedAsync();
@@ -66,10 +71,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Gets the Lightning Network receive limits from the Breez SDK.
         /// </summary>
         [HttpGet("GetLightningReceiveLimits")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> GetLightningReceiveLimits()
         {
             var limits = await _paymentsFacade.FetchLightningLimitsAsync();
-            if (limits == null) return BadRequest("Breez SDK not connected.");
+            if (limits == null) return Error(StatusCodes.Status400BadRequest, "invalid_state", "Breez SDK not connected.");
             return Ok(new { minSat = limits.receive.minSat, maxSat = limits.receive.maxSat });
         }
 
@@ -77,6 +84,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Gets the recommended fees from the Breez SDK.
         /// </summary>
         [HttpGet("GetRecommendedFees")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetRecommendedFees()
         {
             var fees = await _breezSdkService.GetRecommendedFeesAsync();
@@ -88,28 +96,31 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Creates a test invoice with the specified amount and description.
         /// </summary>
         [HttpPost("CreateTestInvoice")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> CreateTestInvoice([FromBody] TestInvoiceRequest request)
         {
-            if (request == null || request.AmountSat <=0) return BadRequest("Invalid amount.");
+            if (request == null || request.AmountSat <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid amount.");
             try
             {
                 var invoice = await _breezSdkService.CreateInvoiceAsync(request.AmountSat, string.IsNullOrWhiteSpace(request.Description) ? "Test invoice" : request.Description!);
                 var paymentHash = await TryGetPaymentHash(invoice);
                 if (string.IsNullOrWhiteSpace(paymentHash))
                 {
-                    return BadRequest("Failed to obtain invoice payment hash.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_invoice", "Failed to obtain invoice payment hash.");
                 }
                 return Ok(new { invoice, paymentHash });
             }
             catch (InvalidInvoiceRequestException ex)
             {
                 _logger.LogWarning(ex, "Invalid request for test invoice.");
-                return BadRequest(ex.Message);
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating test invoice.");
-                return StatusCode(500, "An error occurred while creating the invoice.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while creating the invoice.");
             }
         }
 
@@ -117,9 +128,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Manually confirms a payment by its hash.
         /// </summary>
         [HttpPost("ConfirmPayment")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> ConfirmPayment([FromBody] PaymentHashRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid payment hash.");
             try
             {
                 var result = await _paymentStateService.ConfirmPaymentAsync(request.PaymentHash);
@@ -127,13 +142,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 {
                     PaymentConfirmationResult.Confirmed => Ok(new { status = "confirmed" }),
                     PaymentConfirmationResult.AlreadyConfirmed => Ok(new { status = "already_confirmed" }),
-                    _ => NotFound(new { status = "not_found" })
+                    _ => Error(StatusCodes.Status404NotFound, "not_found", "Payment not found or not confirmable.")
                 };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error confirming payment {PaymentHash}", request.PaymentHash);
-                return StatusCode(500, "An error occurred while confirming the payment.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while confirming the payment.");
             }
         }
 
@@ -141,18 +156,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Marks a payment as failed by its hash.
         /// </summary>
         [HttpPost("MarkAsFailed")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> MarkAsFailed([FromBody] PaymentHashRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid payment hash.");
             try
             {
                 var updated = await _paymentStateService.MarkAsFailedAsync(request.PaymentHash);
-                return updated ? Ok(new { status = "failed" }) : NotFound(new { status = "not_found" });
+                return updated ? Ok(new { status = "failed" }) : Error(StatusCodes.Status404NotFound, "not_found", "Payment not found.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking payment as failed {PaymentHash}", request.PaymentHash);
-                return StatusCode(500, "An error occurred while updating the payment.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while updating the payment.");
             }
         }
 
@@ -160,18 +179,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Marks a payment as expired by its hash.
         /// </summary>
         [HttpPost("MarkAsExpired")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> MarkAsExpired([FromBody] PaymentHashRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid payment hash.");
             try
             {
                 var updated = await _paymentStateService.MarkAsExpiredAsync(request.PaymentHash);
-                return updated ? Ok(new { status = "expired" }) : NotFound(new { status = "not_found" });
+                return updated ? Ok(new { status = "expired" }) : Error(StatusCodes.Status404NotFound, "not_found", "Payment not found.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking payment as expired {PaymentHash}", request.PaymentHash);
-                return StatusCode(500, "An error occurred while updating the payment.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while updating the payment.");
             }
         }
 
@@ -179,18 +202,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Marks a payment as refund pending by its hash.
         /// </summary>
         [HttpPost("MarkAsRefundPending")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> MarkAsRefundPending([FromBody] PaymentHashRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid payment hash.");
             try
             {
                 var updated = await _paymentStateService.MarkAsRefundPendingAsync(request.PaymentHash);
-                return updated ? Ok(new { status = "refund_pending" }) : NotFound(new { status = "not_found" });
+                return updated ? Ok(new { status = "refund_pending" }) : Error(StatusCodes.Status404NotFound, "not_found", "Payment not found.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking payment as refund pending {PaymentHash}", request.PaymentHash);
-                return StatusCode(500, "An error occurred while updating the payment.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while updating the payment.");
             }
         }
 
@@ -198,18 +225,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Marks a payment as refunded by its hash.
         /// </summary>
         [HttpPost("MarkAsRefunded")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> MarkAsRefunded([FromBody] PaymentHashRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid payment hash.");
             try
             {
                 var updated = await _paymentStateService.MarkAsRefundedAsync(request.PaymentHash);
-                return updated ? Ok(new { status = "refunded" }) : NotFound(new { status = "not_found" });
+                return updated ? Ok(new { status = "refunded" }) : Error(StatusCodes.Status404NotFound, "not_found", "Payment not found.");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking payment as refunded {PaymentHash}", request.PaymentHash);
-                return StatusCode(500, "An error occurred while updating the payment.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while updating the payment.");
             }
         }
 
@@ -219,11 +250,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// <param name="contentId">The ID of the Umbraco content item requiring payment.</param>
         /// <returns>A JSON object containing the invoice and payment hash, or an error response.</returns>
         [HttpGet("GetPaywallInvoice")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
         {
             if (contentId <=0)
             {
-                return BadRequest("Invalid content ID.");
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
             }
 
             try
@@ -232,12 +267,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
                 if (content == null || paywallConfig == null)
                 {
-                    return NotFound("Content or paywall configuration not found.");
+                    return Error(StatusCodes.Status404NotFound, "not_found", "Content or paywall configuration not found.");
                 }
 
                 if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
                 {
-                    return BadRequest("Paywall is not enabled or fee is not set.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 }
 
                 _logger.LogInformation("Invoice requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
@@ -247,7 +282,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 var paymentHash = await TryGetPaymentHash(invoice);
                 if (string.IsNullOrWhiteSpace(paymentHash))
                 {
-                    return BadRequest("Failed to obtain invoice payment hash.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_invoice", "Failed to obtain invoice payment hash.");
                 }
 
                 var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ??
@@ -262,7 +297,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating paywall invoice for contentId {ContentId}", contentId);
-                return StatusCode(500, "An error occurred while generating the invoice.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the invoice.");
             }
         }
 
@@ -270,10 +305,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Gets the payment status for a user and content.
         /// </summary>
         [HttpGet("GetPaymentStatus")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> GetPaymentStatus([FromQuery] int contentId)
         {
             var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName];
-            if (string.IsNullOrEmpty(sessionId)) return Unauthorized();
+            if (string.IsNullOrEmpty(sessionId)) return Error(StatusCodes.Status401Unauthorized, "unauthorized", "Session cookie not found.");
 
             var state = await _paymentStateService.GetPaymentStateAsync(sessionId, contentId);
             return Ok(new { status = state?.Status.ToString() });
@@ -283,13 +320,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Gets all payment transactions for admin view.
         /// </summary>
         [HttpGet("GetAllPayments")]
+        [ProducesResponseType(typeof(IEnumerable<PaymentState>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> GetAllPayments()
         {
             var userId = int.Parse(User.Identity.GetUserId());
             var currentUser = _userService.GetUserById(userId);
             if (currentUser == null || !currentUser.Groups.Any(g => g.Name == "Administrators"))
             {
-                return Unauthorized();
+                return Error(StatusCodes.Status401Unauthorized, "unauthorized", "Admin access required.");
             }
 
             var payments = await _paymentStateService.GetAllPaymentsAsync();
@@ -302,6 +341,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// <param name="contentId">The ID of the Umbraco content item.</param>
         /// <returns>JSON object with LNURL-Pay details.</returns>
         [HttpGet("GetLnurlPayInfo")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
         {
             return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
@@ -314,15 +354,19 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// <param name="contentId">The ID of the Umbraco content item.</param>
         /// <returns>JSON object with the payment request (pr).</returns>
         [HttpGet("GetLnurlInvoice")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId)
         {
             if (contentId <= 0)
             {
-                return BadRequest("Invalid content ID.");
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
             }
             if (amount < 0 || amount % 1000 != 0)
             {
-                return BadRequest("Invalid amount. Must be positive and divisible by 1000.");
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid amount. Must be positive and divisible by 1000.");
             }
 
             ulong sats = (ulong)(amount / 1000);
@@ -333,17 +377,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
                 if (content == null || paywallConfig == null)
                 {
-                    return NotFound("Content or paywall configuration not found.");
+                    return Error(StatusCodes.Status404NotFound, "not_found", "Content or paywall configuration not found.");
                 }
 
                 if (!paywallConfig.Enabled || paywallConfig.Fee == 0)
                 {
-                    return BadRequest("Paywall is not enabled or fee is not set.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 }
 
                 if (sats != paywallConfig.Fee)
                 {
-                    return BadRequest("Amount does not match the required fee.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_request", "Amount does not match the required fee.");
                 }
 
                 string description = $"Access to {content.Name} (ID: {contentId})";
@@ -352,7 +396,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 var paymentHash = await TryGetPaymentHash(invoice);
                 if (string.IsNullOrWhiteSpace(paymentHash))
                 {
-                    return BadRequest("Failed to obtain invoice payment hash.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_invoice", "Failed to obtain invoice payment hash.");
                 }
 
                 var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ??
@@ -371,7 +415,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating LNURL invoice for contentId {ContentId} and amount {Amount}", contentId, amount);
-                return StatusCode(500, "An error occurred while generating the invoice.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the invoice.");
             }
         }
 
@@ -379,11 +423,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Gets the Bolt12 offer for a specific content item.
         /// </summary>
         [HttpGet("GetBolt12Offer")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetBolt12Offer([FromQuery] int contentId)
         {
             if (contentId <= 0)
             {
-                return BadRequest("Invalid content ID.");
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
             }
 
             try
@@ -392,12 +440,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
                 if (content == null || paywallConfig == null)
                 {
-                    return NotFound("Content or paywall configuration not found.");
+                    return Error(StatusCodes.Status404NotFound, "not_found", "Content or paywall configuration not found.");
                 }
 
                 if (!paywallConfig.Enabled || paywallConfig.Fee == 0)
                 {
-                    return BadRequest("Paywall is not enabled or fee is not set.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 }
 
                 _logger.LogInformation("Bolt12 offer requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
@@ -409,7 +457,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating Bolt12 offer for contentId {ContentId}", contentId);
-                return StatusCode(500, "An error occurred while generating the offer.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the offer.");
             }
         }
 
@@ -417,11 +465,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// Returns a fee quote (in sats) for receiving the paywall amount for a content item.
         /// </summary>
         [HttpGet("GetPaywallReceiveFeeQuote")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> GetPaywallReceiveFeeQuote([FromQuery] int contentId, [FromQuery] bool bolt12 = false)
         {
             if (contentId <= 0)
             {
-                return BadRequest("Invalid content ID.");
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
             }
 
             try
@@ -429,7 +480,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 var (_, paywallConfig) = GetContentAndPaywallConfig(contentId);
                 if (paywallConfig == null || !paywallConfig.Enabled || paywallConfig.Fee == 0)
                 {
-                    return BadRequest("Paywall is not enabled or fee is not set.");
+                    return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 }
 
                 var feesSat = await _breezSdkService.GetReceiveFeeQuoteAsync(paywallConfig.Fee, bolt12);
@@ -438,12 +489,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             catch (InvalidInvoiceRequestException ex)
             {
                 _logger.LogWarning(ex, "Invalid request for fee quote.");
-                return BadRequest(ex.Message);
+                return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching receive fee quote for contentId {ContentId}", contentId);
-                return StatusCode(500, "An error occurred while fetching the fee quote.");
+                return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while fetching the fee quote.");
             }
         }
 

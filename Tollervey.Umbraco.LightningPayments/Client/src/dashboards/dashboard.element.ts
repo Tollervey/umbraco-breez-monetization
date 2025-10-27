@@ -6,7 +6,7 @@ import {
   state,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
-import QRCode from "qrcode";
+import * as QRCode from "qrcode";
 
 interface Payment {
   paymentHash: string;

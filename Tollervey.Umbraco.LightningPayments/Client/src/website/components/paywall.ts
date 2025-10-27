@@ -16,79 +16,30 @@ export class BreezPaywallElement extends LitElement {
 
  private _pollTimer: number | null = null;
 
- connectedCallback(): void {
- super.connectedCallback();
- this._checkStatus();
- }
-
- disconnectedCallback(): void {
- super.disconnectedCallback();
- this._stopPolling();
- }
+ connectedCallback(): void { super.connectedCallback(); this._checkStatus(); }
+ disconnectedCallback(): void { super.disconnectedCallback(); this._stopPolling(); }
 
  private async _checkStatus() {
- if (!this.contentId || this.contentId <=0) {
- this._error = 'Invalid content id';
- this._loading = false;
- return;
- }
- this._loading = true;
- this._error = '';
+ if (!this.contentId || this.contentId <=0) { this._error = 'Invalid content id'; this._loading = false; return; }
+ this._loading = true; this._error = '';
  try {
  const res = await fetch(`/api/public/lightning/GetPaymentStatus?contentId=${this.contentId}`);
- if (!res.ok) {
- //401 means no cookie yet, treat as unpaid
- if (res.status !==401) throw new Error(`HTTP ${res.status}`);
- this._status = 'unpaid';
- } else {
- const data = await res.json();
- const s = (data?.status || '').toLowerCase();
- this._status = s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : s === 'expired' ? 'expired' : 'unpaid';
- }
- } catch (err: any) {
- console.error('Failed to check payment status', err);
- this._error = err?.message ?? 'Failed to check payment status';
- } finally {
- this._loading = false;
- if (this._status === 'paid') {
- this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true }));
- }
- }
+ if (!res.ok) { if (res.status ===401) { this._status = 'unpaid'; } else { throw new Error(`HTTP ${res.status}`); } }
+ else { const data = await res.json(); const s = (data?.status || '').toLowerCase(); this._status = s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : s === 'expired' ? 'expired' : 'unpaid'; }
+ } catch (err: any) { console.error('Failed to check payment status', err); this._error = err?.message ?? 'Failed to check payment status'; }
+ finally { this._loading = false; if (this._status === 'paid') { this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true })); } }
  }
 
  private _startPolling() { this._stopPolling(); this._pollTimer = window.setInterval(() => this._checkStatus(),2000); }
-
  private _stopPolling() { if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; } }
-
  private _openModal() { this._modalOpen = true; this._status = 'pending'; this._startPolling(); }
-
- private _closeModal = () => {
- this._modalOpen = false;
- // Keep polling briefly in case payment just settled; stop if user closes
- if (this._status !== 'paid') {
- this._stopPolling();
- }
- };
-
- private _onInvoiceGenerated = (_e: CustomEvent) => {
- this._status = 'pending';
- };
+ private _closeModal = () => { this._modalOpen = false; if (this._status !== 'paid') { this._stopPolling(); } };
+ private _onInvoiceGenerated = (_e: CustomEvent) => { this._status = 'pending'; };
 
  render() {
- // Paid: reveal slot content
- if (this._status === 'paid') {
- return html`<slot></slot>`;
- }
-
- // Loading state
- if (this._loading || this._status === 'unknown') {
- return html`<div class="breez-paywall loading">Checking access…</div>`;
- }
-
- // Failed / expired messages
+ if (this._status === 'paid') { return html`<slot></slot>`; }
+ if (this._loading || this._status === 'unknown') { return html`<div class="breez-paywall loading">Checking access…</div>`; }
  const problem = this._status === 'failed' ? 'Payment failed. Please try again.' : this._status === 'expired' ? 'Invoice expired. Generate a new one.' : '';
-
- // Unpaid or pending visual block
  return html`
  <div class="breez-paywall ${this._status}">
  ${this._error ? html`<div class="error">${this._error}</div>` : nothing}
@@ -97,16 +48,7 @@ export class BreezPaywallElement extends LitElement {
  ? html`<button class="primary" @click=${this._openModal}>${this.buttonLabel}</button>`
  : html`<div class="pending">Waiting for payment confirmation…</div>`}
  </div>
-
- <breez-payment-modal
- .open=${this._modalOpen}
- .contentId=${this.contentId}
- .amount=${0}
- .title=${this.title}
- .description=${this.description}
- @close=${this._closeModal}
- @invoice-generated=${this._onInvoiceGenerated}
- ></breez-payment-modal>
+ <breez-payment-modal .open=${this._modalOpen} .contentId=${this.contentId} .amount=${0} .title=${this.title} .description=${this.description} @close=${this._closeModal} @invoice-generated=${this._onInvoiceGenerated}></breez-payment-modal>
  `;
  }
 
@@ -117,13 +59,9 @@ export class BreezPaywallElement extends LitElement {
  .pending { color:#666; }
  .warning { color:#a15c00; }
  .error { color:#b00020; }
- .primary { background:#f89c1c; border:0; color:white; padding:0.5rem0.9rem; border-radius:6px; cursor:pointer; }
+ .primary { background:#f89c1c; border:0; color:white; padding: 0.5rem 0.9rem; border-radius:6px; cursor:pointer; }
  .primary:hover { background:#e68a0a; }
  `;
 }
 
-declare global {
- interface HTMLElementTagNameMap {
- 'breez-paywall': BreezPaywallElement;
- }
-}
+declare global { interface HTMLElementTagNameMap { 'breez-paywall': BreezPaywallElement; } }

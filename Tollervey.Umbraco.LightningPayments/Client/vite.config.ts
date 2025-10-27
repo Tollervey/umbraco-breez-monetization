@@ -1,22 +1,19 @@
 import { defineConfig } from "vite";
+import { resolve } from "node:path";
 
 export default defineConfig({
   build: {
-    outDir: "../wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments",
-    emptyOutDir: true,
-    sourcemap: true,
-    rollupOptions: {
-      input: {
-        "my-extension": "src/bundle.manifests.ts",
-        "lightning-ui": "src/website/website.entry.ts",
-      },
-      external: [/^@umbraco/],
-      output: {
-        entryFileNames: (chunk) => `${chunk.name}.js`,
-        chunkFileNames: (chunk) => `${chunk.name}.js`,
-        assetFileNames: (asset) => `${asset.name}`,
-        format: "es",
-      },
+    lib: {
+      entry: resolve(__dirname, "src/bundle.manifests.ts"),
+      name: "lightning-ui",
+      fileName: () => `lightning-ui.js`,
+      formats: ["es"],
     },
+    rollupOptions: {
+      external: [/^@umbraco-cms\//],
+    },
+    sourcemap: true,
+    outDir: resolve(__dirname, "../wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments"),
+    emptyOutDir: false,
   },
 });
