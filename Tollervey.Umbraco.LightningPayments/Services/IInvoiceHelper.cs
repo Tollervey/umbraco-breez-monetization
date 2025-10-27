@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
@@ -38,16 +40,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  {
  using var cref = _umbracoContextFactory.EnsureUmbracoContext();
  var umbracoContext = cref.UmbracoContext;
- if (umbracoContext == null)
- {
- return (null, null);
- }
-
+ if (umbracoContext == null) return (null, null);
  var content = umbracoContext.Content?.GetById(contentId);
- if (content == null || !content.HasValue("breezPaywall"))
- {
- return (content, null);
- }
+ if (content == null || !content.HasValue("breezPaywall")) return (content, null);
  var paywallJson = content.Value<string>("breezPaywall");
  var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
  var paywallConfig = JsonSerializer.Deserialize<PaywallConfig>(paywallJson ?? "{}", options);
@@ -57,10 +52,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  public async Task<string?> TryGetPaymentHashAsync(string invoice)
  {
  var hash = await _breezSdkService.TryExtractPaymentHashAsync(invoice);
- if (!string.IsNullOrWhiteSpace(hash))
- {
- return hash.ToLowerInvariant();
- }
+ if (!string.IsNullOrWhiteSpace(hash)) return hash.ToLowerInvariant();
  if (_runtimeMode.IsOffline)
  {
  var m = OfflineHashRegex.Match(invoice);
@@ -90,31 +82,44 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  {
  if (contentId <=0)
  {
- return new BadRequestObjectResult("Invalid content ID.");
+ return new BadRequestObjectResult(new { status = "ERROR", reason = "Invalid content ID." });
  }
  try
  {
  var (content, paywallConfig) = GetContentAndPaywallConfig(contentId);
  if (content == null || paywallConfig == null)
  {
- return new NotFoundObjectResult("Content or paywall configuration not found.");
+ return new NotFoundObjectResult(new { status = "ERROR", reason = "Content or paywall configuration not found." });
  }
  if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
  {
- return new BadRequestObjectResult("Paywall is not enabled or fee is not set.");
+ return new BadRequestObjectResult(new { status = "ERROR", reason = "Paywall is not enabled or fee is not set." });
  }
  // ensure session and attach it as state for wallet callback
  var sessionId = EnsureSessionCookie(request, request.HttpContext.Response);
  var callback = $"{request.Scheme}://{request.Host}{callbackPath}?contentId={contentId}&state={Uri.EscapeDataString(sessionId)}";
- var metadata = $"""[[\"text/plain\",\"Access to {content.Name}\"]]""";
+ // build metadata and compute description_hash
+ var name = content.Name;
+ var metadataArray = new object[][]
+ {
+ new object[] { "text/plain", $"Access to {name}" },
+ new object[] { "text/description_hash", "" } // placeholder to advertise presence; wallets usually compute it themselves
+ };
+ var metadata = JsonSerializer.Serialize(metadataArray);
+ using var sha = SHA256.Create();
+ var hashBytes = sha.ComputeHash(Encoding.UTF8.GetBytes(metadata));
+ var descriptionHashHex = Convert.ToHexString(hashBytes).ToLowerInvariant();
+ // replace placeholder value with actual hash
+ metadataArray[1][1] = descriptionHashHex;
+ metadata = JsonSerializer.Serialize(metadataArray);
  ulong minSendable = paywallConfig.Fee *1000UL;
  ulong maxSendable = minSendable;
- return new OkObjectResult(new { tag = "payRequest", callback, minSendable, maxSendable, metadata });
+ return new OkObjectResult(new { tag = "payRequest", callback, minSendable, maxSendable, metadata, descriptionHash = descriptionHashHex });
  }
  catch (Exception ex)
  {
  logger.LogError(ex, "Error generating LNURL-Pay info for contentId {ContentId}", contentId);
- return new ObjectResult("An error occurred while generating LNURL-Pay info.") { StatusCode =500 };
+ return new ObjectResult(new { status = "ERROR", reason = "An error occurred while generating LNURL-Pay info." }) { StatusCode =500 };
  }
  }
  }

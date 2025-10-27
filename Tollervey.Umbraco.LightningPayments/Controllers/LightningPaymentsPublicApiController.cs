@@ -68,9 +68,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
  public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
  {
+ if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
  var rate = CheckRate("paywall");
  if (!rate.Allowed) { Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString(); return Error(StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests. Please try again shortly."); }
- if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
  try
  {
  var (content, paywallConfig) = _invoiceHelper.GetContentAndPaywallConfig(contentId);
