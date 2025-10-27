@@ -31,6 +31,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  private readonly ILogger<LightningPaymentsPublicApiController> _logger;
  private readonly ILightningPaymentsRuntimeMode _runtimeMode;
  private readonly IRateLimiter _rateLimiter;
+ private readonly IInvoiceHelper _invoiceHelper;
 
  private static readonly Regex OfflineHashRegex = new(@"(?:^|-)p=([0-9a-f]{64})(?:-|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -40,7 +41,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  IUmbracoContextFactory umbracoContextFactory,
  ILogger<LightningPaymentsPublicApiController> logger,
  ILightningPaymentsRuntimeMode runtimeMode,
- IRateLimiter rateLimiter)
+ IRateLimiter rateLimiter,
+ IInvoiceHelper invoiceHelper)
  {
  _breezSdkService = breezSdkService;
  _paymentStateService = paymentStateService;
@@ -48,22 +50,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  _logger = logger;
  _runtimeMode = runtimeMode;
  _rateLimiter = rateLimiter;
+ _invoiceHelper = invoiceHelper;
  }
 
- private IActionResult Error(int statusCode, string error, string message)
- {
- return StatusCode(statusCode, new ApiError { error = error, message = message });
- }
+ private IActionResult Error(int statusCode, string error, string message) => StatusCode(statusCode, new ApiError { error = error, message = message });
 
  private (bool Allowed, TimeSpan RetryAfter) CheckRate(string endpointKey)
- {
- var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
- var session = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? "anon";
- var key = $"{endpointKey}:{ip}:{session}";
- // defaults:5 requests /30 seconds
- var allowed = _rateLimiter.TryConsume(key, limit:5, window: TimeSpan.FromSeconds(30), out var retry);
- return (allowed, retry);
- }
+ { var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"; var session = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? "anon"; var key = $"{endpointKey}:{ip}:{session}"; var allowed = _rateLimiter.TryConsume(key,5, TimeSpan.FromSeconds(30), out var retry); return (allowed, retry); }
 
  /// <summary>
  /// Generate a Bolt11 invoice for the content paywall (anonymous).
@@ -76,60 +69,21 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
  {
  var rate = CheckRate("paywall");
- if (!rate.Allowed)
- {
- Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString();
- return Error(StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests. Please try again shortly.");
- }
-
- if (contentId <=0)
- {
- return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
- }
-
+ if (!rate.Allowed) { Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString(); return Error(StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests. Please try again shortly."); }
+ if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
  try
  {
- var (content, paywallConfig) = GetContentAndPaywallConfig(contentId);
- if (content == null || paywallConfig == null)
- {
- return Error(StatusCodes.Status404NotFound, "not_found", "Content or paywall configuration not found.");
- }
- if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
- {
- return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
- }
-
+ var (content, paywallConfig) = _invoiceHelper.GetContentAndPaywallConfig(contentId);
+ if (content == null || paywallConfig == null) return Error(StatusCodes.Status404NotFound, "not_found", "Content or paywall configuration not found.");
+ if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
  _logger.LogInformation("[Public] Invoice requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
-
- var invoice = await _breezSdkService.CreateInvoiceAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
- var paymentHash = await TryGetPaymentHash(invoice);
- if (string.IsNullOrWhiteSpace(paymentHash))
- {
- return Error(StatusCodes.Status400BadRequest, "invalid_invoice", "Failed to obtain invoice payment hash.");
- }
-
- var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
- Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions
- {
- HttpOnly = true,
- Secure = true,
- SameSite = SameSiteMode.Strict
- });
-
- await _paymentStateService.AddPendingPaymentAsync(paymentHash!, contentId, sessionId);
-
+ var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
+ var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
+ await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
  return Ok(new { invoice, paymentHash });
  }
- catch (InvalidInvoiceRequestException ex)
- {
- _logger.LogWarning(ex, "Invalid invoice request for content {ContentId}", contentId);
- return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message);
- }
- catch (Exception ex)
- {
- _logger.LogError(ex, "Error generating paywall invoice for contentId {ContentId}", contentId);
- return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the invoice.");
- }
+ catch (InvalidInvoiceRequestException ex) { _logger.LogWarning(ex, "Invalid invoice request for content {ContentId}", contentId); return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message); }
+ catch (Exception ex) { _logger.LogError(ex, "Error generating paywall invoice for contentId {ContentId}", contentId); return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the invoice."); }
  }
 
  /// <summary>
@@ -139,23 +93,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
  [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
  public async Task<IActionResult> GetPaymentStatus([FromQuery] int contentId)
- {
- var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName];
- if (string.IsNullOrEmpty(sessionId)) return Error(StatusCodes.Status401Unauthorized, "unauthorized", "Session cookie not found.");
-
- var state = await _paymentStateService.GetPaymentStateAsync(sessionId, contentId);
- return Ok(new { status = state?.Status.ToString() });
- }
+ { var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName]; if (string.IsNullOrEmpty(sessionId)) return Error(StatusCodes.Status401Unauthorized, "unauthorized", "Session cookie not found."); var state = await _paymentStateService.GetPaymentStateAsync(sessionId, contentId); return Ok(new { status = state?.Status.ToString() }); }
 
  /// <summary>
  /// LNURL-Pay metadata for a specific content item (anonymous).
  /// </summary>
  [HttpGet("GetLnurlPayInfo")]
  public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
- {
- // Callback points back to this controller's public callback endpoint
- return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/api/public/lightning/GetLnurlInvoice");
- }
+ { return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/api/public/lightning/GetLnurlInvoice"); }
 
  /// <summary>
  /// LNURL-Pay callback to create a Bolt11 invoice (anonymous). Amount is in millisats.
@@ -164,65 +109,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId, [FromQuery] string? state = null)
  {
  var rate = CheckRate("lnurl");
- if (!rate.Allowed)
- {
- Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString();
- return StatusCode(StatusCodes.Status429TooManyRequests, "Too many requests. Please try again shortly.");
- }
-
- if (contentId <=0)
- {
- return BadRequest("Invalid content ID.");
- }
- if (amount <0 || amount %1000 !=0)
- {
- return BadRequest("Invalid amount. Must be positive and divisible by1000.");
- }
-
- ulong sats = (ulong)(amount /1000);
-
+ if (!rate.Allowed) { Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString(); return StatusCode(StatusCodes.Status429TooManyRequests, "Too many requests. Please try again shortly."); }
+ if (contentId <=0) return BadRequest("Invalid content ID.");
+ if (amount <0 || amount %1000 !=0) return BadRequest("Invalid amount. Must be positive and divisible by1000.");
+ var sats = (ulong)(amount /1000);
  try
  {
- var (content, paywallConfig) = GetContentAndPaywallConfig(contentId);
- if (content == null || paywallConfig == null)
- {
- return NotFound("Content or paywall configuration not found.");
- }
- if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
- {
- return BadRequest("Paywall is not enabled or fee is not set.");
- }
- if (sats != paywallConfig.Fee)
- {
- return BadRequest("Amount does not match the required fee.");
- }
- string description = $"Access to {content.Name} (ID: {contentId})";
- var invoice = await _breezSdkService.CreateInvoiceAsync(sats, description);
- var paymentHash = await TryGetPaymentHash(invoice);
- if (string.IsNullOrWhiteSpace(paymentHash))
- {
- return BadRequest("Failed to obtain invoice payment hash.");
- }
-
- // When called from wallets, our cookie-based session does not flow. If a `state` was provided by
- // our LNURL metadata, use it to associate the pending payment with the user's browser session.
- string sessionId = !string.IsNullOrWhiteSpace(state) ? state! : (Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString());
- Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions
- {
- HttpOnly = true,
- Secure = true,
- SameSite = SameSiteMode.Strict
- });
-
- await _paymentStateService.AddPendingPaymentAsync(paymentHash!, contentId, sessionId);
-
+ var (content, paywallConfig) = _invoiceHelper.GetContentAndPaywallConfig(contentId);
+ if (content == null || paywallConfig == null) return NotFound("Content or paywall configuration not found.");
+ if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return BadRequest("Paywall is not enabled or fee is not set.");
+ if (sats != paywallConfig.Fee) return BadRequest("Amount does not match the required fee.");
+ var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(sats, $"Access to {content.Name} (ID: {contentId})");
+ var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response, state);
+ await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
  return Ok(new { pr = invoice });
  }
- catch (Exception ex)
- {
- _logger.LogError(ex, "Error generating LNURL invoice for contentId {ContentId} and amount {Amount}", contentId, amount);
- return StatusCode(500, "An error occurred while generating the invoice.");
- }
+ catch (Exception ex) { _logger.LogError(ex, "Error generating LNURL invoice for contentId {ContentId} and amount {Amount}", contentId, amount); return StatusCode(500, "An error occurred while generating the invoice."); }
  }
 
  /// <summary>
@@ -231,31 +133,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [HttpGet("GetBolt12Offer")]
  public async Task<IActionResult> GetBolt12Offer([FromQuery] int contentId)
  {
- if (contentId <=0)
- {
- return BadRequest("Invalid content ID.");
- }
-
+ if (contentId <=0) return BadRequest("Invalid content ID.");
  try
  {
- var (content, paywallConfig) = GetContentAndPaywallConfig(contentId);
- if (content == null || paywallConfig == null)
- {
- return NotFound("Content or paywall configuration not found.");
- }
- if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
- {
- return BadRequest("Paywall is not enabled or fee is not set.");
- }
+ var (content, paywallConfig) = _invoiceHelper.GetContentAndPaywallConfig(contentId);
+ if (content == null || paywallConfig == null) return NotFound("Content or paywall configuration not found.");
+ if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return BadRequest("Paywall is not enabled or fee is not set.");
  _logger.LogInformation("[Public] Bolt12 offer requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
  var offer = await _breezSdkService.CreateBolt12OfferAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
  return Ok(offer);
  }
- catch (Exception ex)
- {
- _logger.LogError(ex, "Error generating Bolt12 offer for contentId {ContentId}", contentId);
- return StatusCode(500, "An error occurred while generating the offer.");
- }
+ catch (Exception ex) { _logger.LogError(ex, "Error generating Bolt12 offer for contentId {ContentId}", contentId); return StatusCode(500, "An error occurred while generating the offer."); }
  }
 
  /// <summary>
@@ -265,43 +153,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  public async Task<IActionResult> CreateTipInvoice([FromBody] TipInvoiceRequest request)
  {
  var rate = CheckRate("tip");
- if (!rate.Allowed)
- {
- Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString();
- return StatusCode(StatusCodes.Status429TooManyRequests, "Too many requests. Please try again shortly.");
- }
-
- if (request == null || request.AmountSat <=0)
- {
- return BadRequest("Invalid amount.");
- }
-
+ if (!rate.Allowed) { Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString(); return StatusCode(StatusCodes.Status429TooManyRequests, "Too many requests. Please try again shortly."); }
+ if (request == null || request.AmountSat <=0) return BadRequest("Invalid amount.");
  try
  {
- var description = string.IsNullOrWhiteSpace(request.Label)
- ? (request.ContentId.HasValue ? $"Tip for content {request.ContentId.Value}" : "Tip jar contribution")
- : request.Label!;
-
- var invoice = await _breezSdkService.CreateInvoiceAsync(request.AmountSat, description);
- var paymentHash = await TryGetPaymentHash(invoice);
- if (string.IsNullOrWhiteSpace(paymentHash))
- {
- return BadRequest("Failed to obtain invoice payment hash.");
- }
-
- // Record a pending TIP with amount for stats. Use session0/empty since tips are not tied to access.
- var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
- Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
- await _paymentStateService.AddPendingPaymentAsync(paymentHash!, request.ContentId ??0, sessionId);
- await _paymentStateService.SetPaymentMetadataAsync(paymentHash!, request.AmountSat, PaymentKind.Tip);
-
+ var description = string.IsNullOrWhiteSpace(request.Label) ? (request.ContentId.HasValue ? $"Tip for content {request.ContentId.Value}" : "Tip jar contribution") : request.Label!;
+ var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(request.AmountSat, description);
+ var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
+ await _paymentStateService.AddPendingPaymentAsync(paymentHash, request.ContentId ??0, sessionId);
+ await _paymentStateService.SetPaymentMetadataAsync(paymentHash, request.AmountSat, PaymentKind.Tip);
  return Ok(new { invoice, paymentHash });
  }
- catch (Exception ex)
- {
- _logger.LogError(ex, "Error creating tip invoice for amount {Amount}", request.AmountSat);
- return StatusCode(500, "An error occurred while creating the tip invoice.");
- }
+ catch (Exception ex) { _logger.LogError(ex, "Error creating tip invoice for amount {Amount}", request.AmountSat); return StatusCode(500, "An error occurred while creating the tip invoice."); }
  }
 
  /// <summary>
@@ -319,60 +182,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  var total = paid.Aggregate<PaymentState, ulong>(0, (acc, p) => acc + p.AmountSat);
  return Ok(new { count, totalSats = total });
  }
- catch (Exception ex)
- {
- _logger.LogError(ex, "Error getting tip stats for ContentId {ContentId}", contentId);
- return StatusCode(500, "An error occurred while fetching tip stats.");
- }
- }
- 
- private (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId)
- {
- using var cref = _umbracoContextFactory.EnsureUmbracoContext();
- var umbracoContext = cref.UmbracoContext;
- if (umbracoContext == null)
- {
- return (null, null);
- }
-
- var content = umbracoContext.Content?.GetById(contentId);
- if (content == null || !content.HasValue("breezPaywall"))
- {
- return (content, null);
- }
-
- var paywallJson = content.Value<string>("breezPaywall");
- var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
- var paywallConfig = JsonSerializer.Deserialize<PaywallConfig>(paywallJson ?? "{}", options);
-
- return (content, paywallConfig);
- }
-
- private async Task<string?> TryGetPaymentHash(string invoice)
- {
- var hash = await _breezSdkService.TryExtractPaymentHashAsync(invoice);
- if (!string.IsNullOrWhiteSpace(hash))
- {
- return hash.ToLowerInvariant();
- }
-
- if (_runtimeMode.IsOffline)
- {
- var m = OfflineHashRegex.Match(invoice);
- if (m.Success)
- {
- return m.Groups[1].Value.ToLowerInvariant();
+ catch (Exception ex) { _logger.LogError(ex, "Error getting tip stats for ContentId {ContentId}", contentId); return StatusCode(500, "An error occurred while fetching tip stats."); }
  }
  }
 
- return null;
- }
- }
-
- public class TipInvoiceRequest
- {
- public ulong AmountSat { get; set; }
- public int? ContentId { get; set; }
- public string? Label { get; set; }
- }
+ public class TipInvoiceRequest { public ulong AmountSat { get; set; } public int? ContentId { get; set; } public string? Label { get; set; } }
 }

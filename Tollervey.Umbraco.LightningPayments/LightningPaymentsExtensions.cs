@@ -60,6 +60,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Rate limiter
             builder.Services.AddSingleton<IRateLimiter, MemoryRateLimiter>();
+            builder.Services.AddScoped<IInvoiceHelper, InvoiceHelper>();
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
