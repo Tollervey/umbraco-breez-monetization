@@ -61,6 +61,10 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   @state() private rowActionBusy: Record<string, boolean> = {};
   @state() private rowActionError: Record<string, string> = {};
 
+  // realtime event log
+  private _evtSrc?: EventSource;
+  @state() private eventLog: Array<{ time: string; type: string; details: string }>= [];
+
   constructor() {
     super();
     this.loadAll();
@@ -69,10 +73,37 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   connectedCallback(): void {
     super.connectedCallback();
     if (this.autoRefresh) this.startAutoRefresh();
+    this.connectRealtime();
   }
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.stopAutoRefresh();
+    this._evtSrc?.close();
+    this._evtSrc = undefined;
+  }
+
+  private connectRealtime() {
+    try {
+      this._evtSrc?.close();
+      this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
+      this._evtSrc.addEventListener('payment-succeeded', async () => {
+        // new payment, refresh table fast
+        await this.loadPayments();
+      });
+      this._evtSrc.addEventListener('breez-event', (ev: MessageEvent) => {
+        try {
+          const data = JSON.parse(ev.data);
+          const entry = {
+            time: new Date().toLocaleTimeString(),
+            type: String(data?.type ?? 'Unknown'),
+            details: String(data?.details ?? '')
+          };
+          const max =50;
+          this.eventLog = [entry, ...this.eventLog].slice(0, max);
+        } catch { /* ignore */ }
+      });
+      this._evtSrc.onerror = () => { /* browser retries automatically */ };
+    } catch { /* ignore */ }
   }
 
   private async loadAll() {
@@ -217,6 +248,7 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
           ${this.renderQuote()}
           ${this.renderTestTools()}
           ${this.renderPaymentsTable()}
+          ${this.renderEventLog()}
         </div>
       </umb-body-layout>`;
   }
@@ -364,6 +396,16 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     `;
   }
 
+  private renderEventLog() {
+    return html`
+      <uui-box headline="Live events">
+        <ul class="event-log">
+          ${this.eventLog.map(e => html`<li><span class="t">${e.time}</span> <strong>${e.type}</strong> <span class="d">${e.details}</span></li>`)}
+        </ul>
+      </uui-box>
+    `;
+  }
+
   static styles = [
     css`
       :host { display:block; padding: var(--uui-size-layout-1); }
@@ -371,65 +413,28 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
       h2 { margin-top:0; }
       .toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; }
       .auto { display:flex; gap:0.35rem; align-items:center; color: var(--uui-color-text); }
-      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem 1rem; }
+      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem1rem; }
       .fees-details { margin-top:0.5rem; }
-      .quote-row { display:grid; grid-template-columns: 1fr 1fr auto; gap:0.5rem; align-items:end; }
+      .quote-row { display:grid; grid-template-columns:1fr1fr auto; gap:0.5rem; align-items:end; }
       .quote-out { margin-top:0.5rem; }
       .test-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1rem;
+        gap:1rem;
         align-items: end;
       }
-      .test-actions {
-        margin-top: 0.5rem;
-      }
-      .invoice-out {
-        margin-top: 1rem;
-        display: grid;
-        grid-template-columns: 240px 1fr;
-        gap: 1rem;
-      }
-      .qr {
-        width: 240px;
-        height: 240px;
-        background: white;
-        border: 1px solid var(--uui-color-border);
-        border-radius: 4px;
-        padding: 4px;
-      }
-      .invoice-text uui-textarea {
-        width: 100%;
-        height: 120px;
-      }
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        margin-top: 0.5rem;
-      }
-      .open-wallet {
-        text-decoration: none;
-        background: var(--uui-color-highlight);
-        color: var(--uui-color-surface);
-        padding: 0.4rem 0.6rem;
-        border-radius: 4px;
-      }
-      .hash {
-        margin-top: 0.5rem;
-        color: var(--uui-color-text-alt);
-        font-family: monospace;
-      }
-      .row-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-      }
-      .row-error {
-        margin-top: 0.25rem;
-        color: var(--uui-color-danger);
-        font-size: 0.85rem;
-      }
+      .test-actions { margin-top:0.5rem; }
+      .invoice-out { margin-top:1rem; display: grid; grid-template-columns:240px1fr; gap:1rem; }
+      .qr { width:240px; height:240px; background: white; border:1px solid var(--uui-color-border); border-radius:4px; padding:4px; }
+      .invoice-text uui-textarea { width:100%; height:120px; }
+      .actions { display: flex; gap:0.5rem; align-items: center; margin-top:0.5rem; }
+      .open-wallet { text-decoration: none; background: var(--uui-color-highlight); color: var(--uui-color-surface); padding:0.4rem0.6rem; border-radius:4px; }
+      .hash { margin-top:0.5rem; color: var(--uui-color-text-alt); font-family: monospace; }
+      .row-actions { display: flex; flex-wrap: wrap; gap:0.25rem; }
+      .row-error { margin-top:0.25rem; color: var(--uui-color-danger); font-size:0.85rem; }
+      .event-log { list-style: none; padding:0; margin:0; display:flex; flex-direction: column; gap:0.25rem; }
+      .event-log .t { color: var(--uui-color-text-alt); margin-right:0.5rem; }
+      .event-log .d { color: var(--uui-color-text-alt); }
     `,
   ];
 }

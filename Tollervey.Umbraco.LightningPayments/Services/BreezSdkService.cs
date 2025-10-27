@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Diagnostics;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
@@ -538,12 +539,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
                 _logger.LogInformation("BreezSDK: Received event of type {EventType}: {EventDetails}", e.GetType().Name, e.ToString());
 
+                using var scope = _serviceProvider.CreateScope();
+                var breezEventProcessor = scope.ServiceProvider.GetRequiredService<IBreezEventProcessor>();
+
                 if (e is SdkEvent.PaymentSucceeded succeeded)
                 {
-                    using var scope = _serviceProvider.CreateScope();
-                    var breezEventProcessor = scope.ServiceProvider.GetRequiredService<IBreezEventProcessor>();
                     _ = breezEventProcessor.EnqueueEvent(succeeded);
                 }
+
+                // Forward all events (including PaymentSucceeded) for generic broadcasting/logging
+                _ = breezEventProcessor.Enqueue(e);
             }
         }
     }

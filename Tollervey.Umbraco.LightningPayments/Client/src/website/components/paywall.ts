@@ -14,10 +14,27 @@ export class BreezPaywallElement extends LitElement {
  @state() private _error: string = '';
  @state() private _modalOpen: boolean = false;
 
- private _pollTimer: number | null = null;
+ private _evtSrc?: EventSource;
 
- connectedCallback(): void { super.connectedCallback(); this._checkStatus(); }
- disconnectedCallback(): void { super.disconnectedCallback(); this._stopPolling(); }
+ connectedCallback(): void { super.connectedCallback(); this._checkStatus(); this._connectRealtime(); }
+ disconnectedCallback(): void { super.disconnectedCallback(); this._evtSrc?.close(); this._evtSrc = undefined; }
+
+ private _connectRealtime() {
+ try {
+ this._evtSrc?.close();
+ this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
+ this._evtSrc.addEventListener('payment-succeeded', (ev: MessageEvent) => {
+ try {
+ const data = JSON.parse(ev.data);
+ if (typeof data?.contentId === 'number' && data.contentId === this.contentId) {
+ this._status = 'paid';
+ this._modalOpen = false;
+ }
+ } catch { /* ignore */ }
+ });
+ this._evtSrc.onerror = () => { /* keep retrying */ };
+ } catch { /* ignore */ }
+ }
 
  private async _checkStatus() {
  if (!this.contentId || this.contentId <=0) { this._error = 'Invalid content id'; this._loading = false; return; }
@@ -30,10 +47,8 @@ export class BreezPaywallElement extends LitElement {
  finally { this._loading = false; if (this._status === 'paid') { this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true })); } }
  }
 
- private _startPolling() { this._stopPolling(); this._pollTimer = window.setInterval(() => this._checkStatus(),2000); }
- private _stopPolling() { if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; } }
- private _openModal() { this._modalOpen = true; this._status = 'pending'; this._startPolling(); }
- private _closeModal = () => { this._modalOpen = false; if (this._status !== 'paid') { this._stopPolling(); } };
+ private _openModal() { this._modalOpen = true; this._status = 'pending'; }
+ private _closeModal = () => { this._modalOpen = false; };
  private _onInvoiceGenerated = (_e: CustomEvent) => { this._status = 'pending'; };
 
  render() {
@@ -59,7 +74,7 @@ export class BreezPaywallElement extends LitElement {
  .pending { color:#666; }
  .warning { color:#a15c00; }
  .error { color:#b00020; }
- .primary { background:#f89c1c; border:0; color:white; padding: 0.5rem 0.9rem; border-radius:6px; cursor:pointer; }
+ .primary { background:#f89c1c; border:0; color:white; padding:0.5rem0.9rem; border-radius:6px; cursor:pointer; }
  .primary:hover { background:#e68a0a; }
  `;
 }

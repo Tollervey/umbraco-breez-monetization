@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using System.Threading.Channels;
 using Breez.Sdk.Liquid;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,42 +15,63 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         private readonly ILogger<BreezEventProcessor> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly Channel<SdkEvent.PaymentSucceeded> _queue;
+        private readonly Channel<SdkEvent> _eventQueue = Channel.CreateUnbounded<SdkEvent>();
         private Task? _consumerTask;
+        private Task? _eventConsumerTask;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
 
         public BreezEventProcessor(ILogger<BreezEventProcessor> logger, IServiceScopeFactory scopeFactory)
         {
             _logger = logger;
             _scopeFactory = scopeFactory;
-            var options = new BoundedChannelOptions(100)
-            {
-                FullMode = BoundedChannelFullMode.Wait
-            };
+            var options = new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.Wait };
             _queue = Channel.CreateBounded<SdkEvent.PaymentSucceeded>(options);
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
         {
             _consumerTask = Task.Run(async () => await ConsumeQueueAsync(_cts.Token), cancellationToken);
+            _eventConsumerTask = Task.Run(async () => await ConsumeGeneralEventsAsync(_cts.Token), cancellationToken);
             return Task.CompletedTask;
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             _cts.Cancel();
-            if (_consumerTask != null)
-            {
-                await _consumerTask;
-            }
+            if (_consumerTask != null) await _consumerTask;
+            if (_eventConsumerTask != null) await _eventConsumerTask;
         }
 
         public async Task EnqueueEvent(SdkEvent.PaymentSucceeded e)
         {
             if (!_queue.Writer.TryWrite(e))
             {
-                _logger.LogWarning("BreezSDK: Event queue is full. Dropping event of type {EventType}.", e.GetType().Name);
-                // Optional: Implement a durable store for overflow events here.
+                _logger.LogWarning("BreezSDK: Event queue is full. Dropping PaymentSucceeded event.");
                 await _queue.Writer.WriteAsync(e);
+            }
+        }
+
+        public async Task Enqueue(SdkEvent e)
+        {
+            await _eventQueue.Writer.WriteAsync(e);
+        }
+
+        private async Task ConsumeGeneralEventsAsync(CancellationToken ct)
+        {
+            await foreach (var e in _eventQueue.Reader.ReadAllAsync(ct))
+            {
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var sseHub = scope.ServiceProvider.GetRequiredService<SseHub>();
+                    var payload = new { type = e.GetType().Name, details = e.ToString() };
+                    // Broadcast to all connected sessions (use a special key "*" to mean broadcast-all)
+                    sseHub.Broadcast("*", "breez-event", payload);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to broadcast Breez SDK event.");
+                }
             }
         }
 

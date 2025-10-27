@@ -62,7 +62,7 @@ const e = [
     alias: "lightning-payments-dashboard",
     name: "Lightning Payments Dashboard",
     elementName: "lightning-payments-dashboard",
-    js: () => import("./dashboard.element-MycfWCqH.js"),
+    js: () => import("./dashboard.element-A9sSLIGC.js"),
     meta: {
       label: "Lightning Payments",
       pathname: "lightning-payments"
