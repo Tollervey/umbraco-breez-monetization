@@ -23,8 +23,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [HttpGet("/.well-known/lnurlp/{name}")]
         public IActionResult GetLightningAddress(string name, [FromQuery] int contentId)
         {
-            // Ignore name for now
-            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
+            // The LNURL metadata callback should point to the public controller now
+            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/api/public/lightning/GetLnurlInvoice");
         }
     }
 }
