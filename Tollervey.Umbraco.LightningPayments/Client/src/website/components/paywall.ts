@@ -9,6 +9,12 @@ export class BreezPaywallElement extends LitElement {
  @property({ type: String }) title: string = 'Unlock content';
  @property({ type: String }) description: string = 'One-time Lightning payment to access this content.';
 
+ // labels
+ @property({ type: String, attribute: 'checking-label' }) checkingLabel = 'Checking access…';
+ @property({ type: String, attribute: 'waiting-label' }) waitingLabel = 'Waiting for payment confirmation…';
+ @property({ type: String, attribute: 'failed-label' }) failedLabel = 'Payment failed. Please try again.';
+ @property({ type: String, attribute: 'expired-label' }) expiredLabel = 'Invoice expired. Generate a new one.';
+
  @state() private _status: 'unknown' | 'paid' | 'pending' | 'failed' | 'expired' | 'unpaid' = 'unknown';
  @state() private _loading: boolean = true;
  @state() private _error: string = '';
@@ -53,15 +59,15 @@ export class BreezPaywallElement extends LitElement {
 
  render() {
  if (this._status === 'paid') { return html`<slot></slot>`; }
- if (this._loading || this._status === 'unknown') { return html`<div class="breez-paywall loading">Checking access…</div>`; }
- const problem = this._status === 'failed' ? 'Payment failed. Please try again.' : this._status === 'expired' ? 'Invoice expired. Generate a new one.' : '';
+ if (this._loading || this._status === 'unknown') { return html`<div class="breez-paywall loading" role="status" aria-live="polite">${this.checkingLabel}</div>`; }
+ const problem = this._status === 'failed' ? this.failedLabel : this._status === 'expired' ? this.expiredLabel : '';
  return html`
  <div class="breez-paywall ${this._status}">
- ${this._error ? html`<div class="error">${this._error}</div>` : nothing}
- ${problem ? html`<div class="warning">${problem}</div>` : nothing}
+ ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : nothing}
+ ${problem ? html`<div class="warning" role="status" aria-live="polite">${problem}</div>` : nothing}
  ${this._status !== 'pending'
  ? html`<button class="primary" @click=${this._openModal}>${this.buttonLabel}</button>`
- : html`<div class="pending">Waiting for payment confirmation…</div>`}
+ : html`<div class="pending" role="status" aria-live="polite">${this.waitingLabel}</div>`}
  </div>
  <breez-payment-modal .open=${this._modalOpen} .contentId=${this.contentId} .amount=${0} .title=${this.title} .description=${this.description} @close=${this._closeModal} @invoice-generated=${this._onInvoiceGenerated}></breez-payment-modal>
  `;

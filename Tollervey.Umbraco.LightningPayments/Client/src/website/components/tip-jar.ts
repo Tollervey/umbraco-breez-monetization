@@ -16,6 +16,12 @@ export class BreezTipJarElement extends LitElement {
  @property({ type: String }) title: string = 'Send a tip';
  @property({ type: String }) description: string = 'Thank you for supporting!';
 
+ // i18n/configurable labels
+ @property({ type: String, attribute: 'tip-button-label' }) tipButtonLabel = 'Tip';
+ @property({ type: String, attribute: 'please-wait-label' }) pleaseWaitLabel = 'Please wait…';
+ @property({ type: String, attribute: 'thanks-label' }) thanksLabel = 'Thanks for your tip!';
+ @property({ type: String, attribute: 'stats-error-label' }) statsErrorLabel = 'Failed to load stats';
+
  @state() private _selected: number =1000;
  @state() private _loading = false;
  @state() private _error = '';
@@ -60,20 +66,20 @@ export class BreezTipJarElement extends LitElement {
  }
  } catch { /* ignore */ }
  });
- this._evtSrc.onerror = () => { /* keep connection alive; browser will retry */ };
- } catch (e) { /* ignore */ }
+ this._evtSrc.onerror = () => { /* keep connection alive */ };
+ } catch { /* ignore */ }
  }
 
  private async loadStats() {
  const url = this.contentId ? `/api/public/lightning/GetTipStats?contentId=${this.contentId}` : `/api/public/lightning/GetTipStats`;
  try {
  const res = await fetch(url);
- if (!res.ok) return; // optional
+ if (!res.ok) return;
  const data = await res.json();
  this._totalSats = typeof data.totalSats === 'number' ? data.totalSats : null;
  this._count = typeof data.count === 'number' ? data.count : null;
  } catch (e: any) {
- this._statsError = e?.message ?? 'Failed to load stats';
+ this._statsError = e?.message ?? this.statsErrorLabel;
  }
  }
 
@@ -104,20 +110,21 @@ export class BreezTipJarElement extends LitElement {
  render() {
  return html`
  <div class="tip-jar">
- <div class="row">
+ <div class="row" role="group" aria-label="Tip amounts">
  ${this.amounts.map(a => html`
- <button class="amount-btn" @click=${() => this._selected = a} ?data-selected=${this._selected === a}>${a.toLocaleString()} sats</button>
+ <button class="amount-btn" @click=${() => this._selected = a} ?data-selected=${this._selected === a} aria-pressed=${this._selected === a ? 'true' : 'false'}>${a.toLocaleString()} sats</button>
  `)}
  <label class="custom-input">
+ <span class="sr-only">Custom amount</span>
  <input type="number" min="1" step="1" .value=${this._selected} @input=${(e: any) => this._selected = Math.max(1, parseInt(e.target.value ||0))} />
- <span>sats</span>
+ <span aria-hidden="true">sats</span>
  </label>
  </div>
- ${this._statsError ? html`<div class="stats error">${this._statsError}</div>` : ''}
- ${this._totalSats != null && this._count != null ? html`<div class="stats">${this._count} tips, ${this._totalSats.toLocaleString()} sats total</div>` : ''}
- ${this._thanks ? html`<div class="thanks">Thanks for your tip! ??</div>` : ''}
- ${this._error ? html`<div class="error">${this._error}</div>` : ''}
- <button class="primary" @click=${this._createTip} ?disabled=${this._loading}>${this._loading ? 'Please wait…' : 'Tip'}</button>
+ ${this._statsError ? html`<div class="stats error" role="alert">${this._statsError}</div>` : ''}
+ ${this._totalSats != null && this._count != null ? html`<div class="stats" aria-live="polite">${this._count} tips, ${this._totalSats.toLocaleString()} sats total</div>` : ''}
+ ${this._thanks ? html`<div class="thanks" role="status" aria-live="polite">${this.thanksLabel} ??</div>` : ''}
+ ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : ''}
+ <button class="primary" @click=${this._createTip} ?disabled=${this._loading} aria-busy=${this._loading ? 'true' : 'false'}>${this._loading ? this.pleaseWaitLabel : this.tipButtonLabel}</button>
  </div>
 
  <breez-payment-modal
@@ -133,6 +140,7 @@ export class BreezTipJarElement extends LitElement {
 
  static styles = css`
  :host { display: block; }
+ .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
  .tip-jar { display: flex; flex-direction: column; gap:0.75rem; }
  .row { display: flex; flex-wrap: wrap; gap:0.5rem; align-items: center; }
  .amount-btn { background: #f1f1f1; border:1px solid #ddd; border-radius:6px; padding:0.4rem0.7rem; cursor: pointer; }
