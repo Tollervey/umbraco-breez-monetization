@@ -53,7 +53,6 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddHostedService(sp => sp.GetRequiredService<BreezEventProcessor>());
             builder.Services.AddHostedService<PaymentDbInitializer>();
             builder.Services.AddMemoryCache();
-            builder.Services.AddSingleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>();
 
             // Realtime hub (SSE)
             builder.Services.AddSingleton<SseHub>();

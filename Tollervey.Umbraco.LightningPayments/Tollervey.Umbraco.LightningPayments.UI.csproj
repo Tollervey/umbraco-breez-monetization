@@ -37,6 +37,7 @@
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="*" />
     <PackageReference Include="Umbraco.Cms.Api.Common" Version="*" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="*" />
+    <PackageReference Include="MailKit" Version="4.6.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,6 +54,7 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
+    <Folder Include="wwwroot\App_Plugins\MyExtension\" />
   </ItemGroup>
 
   <!-- Restore and build Client files -->

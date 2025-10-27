@@ -83,7 +83,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 try
                 {
                     using var scope = _scopeFactory.CreateScope();
-                    var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
                     var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
                     var sseHub = scope.ServiceProvider.GetRequiredService<SseHub>();
 
@@ -125,23 +124,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                         continue;
                     }
 
-                    if (!deduper.TryBegin(paymentHash))
-                    {
-                        _logger.LogInformation("Duplicate payment succeeded event for hash: {PaymentHash}", paymentHash);
-                        continue;
-                    }
+                    // Confirm and broadcast. If duplicate events arrive, calling ConfirmPaymentAsync for an already-paid
+                    // hash is idempotent and returns AlreadyConfirmed, so a separate deduper is unnecessary.
+                    var result = await paymentService.ConfirmPaymentAsync(paymentHash);
+                    _logger.LogInformation("PaymentSucceeded processed for hash: {PaymentHash} => {Result}", paymentHash, result);
 
-                    await paymentService.ConfirmPaymentAsync(paymentHash);
-                    _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
-
-                    // Lookup the session to notify and broadcast SSE to the correct browser session
                     var state = await paymentService.GetByPaymentHashAsync(paymentHash);
                     if (state != null && !string.IsNullOrWhiteSpace(state.UserSessionId))
                     {
                         sseHub.Broadcast(state.UserSessionId, "payment-succeeded", new { paymentHash = state.PaymentHash, contentId = state.ContentId, kind = state.Kind.ToString(), status = state.Status.ToString(), amountSat = state.AmountSat });
                     }
 
-                    deduper.Complete(paymentHash);
                     activity?.SetStatus(ActivityStatusCode.Ok);
                 }
                 catch (Exception ex)

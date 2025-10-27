@@ -24,7 +24,7 @@
 * Open a terminal inside the `\Client` folder
 * Run `npm install` to install all the dependencies
 * Run `npm run build` to build the project
-* The build output is copied to `wwwroot\App_Plugins\MyExtension\my-extension.js`
+* The build output is copied to `wwwroot\App_Plugins\Tollervey.Umbraco.LightningPayments\lightning-ui.js`
 
 == File Watching ==
 * Add this Razor Class Library Project as a project reference to an Umbraco Website project
@@ -47,8 +47,8 @@ Default Configuration
 
 Installation and Migrations
 1. After installing the package, open a terminal in your project's root directory.
-2. Create an initial migration (if not already done): dotnet ef migrations add InitialCreate --project Tollervey.Umbraco.LightningPayments.csproj
-3. Apply the migration to create/update the database schema: dotnet ef database update --project Tollervey.Umbraco.LightningPayments.csproj
+2. Create an initial migration (if not already done): dotnet ef migrations add InitialCreate --project Tollervey.Umbraco.LightningPayments.UI.csproj
+3. Apply the migration to create/update the database schema: dotnet ef database update --project Tollervey.Umbraco.LightningPayments.UI.csproj
 - Run dotnet ef database update after package updates to apply any new migrations.
 
 Production Considerations
