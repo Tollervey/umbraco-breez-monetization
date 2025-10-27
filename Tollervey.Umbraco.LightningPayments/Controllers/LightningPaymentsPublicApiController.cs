@@ -184,6 +184,19 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  }
  catch (Exception ex) { _logger.LogError(ex, "Error getting tip stats for ContentId {ContentId}", contentId); return StatusCode(500, "An error occurred while fetching tip stats."); }
  }
+
+ /// <summary>
+ /// Gets the payment status by payment hash (anonymous).
+ /// </summary>
+ [HttpGet("GetPaymentStatusByHash")]
+ [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+ public async Task<IActionResult> GetPaymentStatusByHash([FromQuery] string paymentHash)
+ {
+ if (string.IsNullOrWhiteSpace(paymentHash)) return BadRequest(new { error = "invalid_request", message = "Missing paymentHash." });
+ var state = await _paymentStateService.GetByPaymentHashAsync(paymentHash);
+ if (state == null) return Ok(new { status = "not_found" });
+ return Ok(new { status = state.Status.ToString() });
+ }
  }
 
  public class TipInvoiceRequest { public ulong AmountSat { get; set; } public int? ContentId { get; set; } public string? Label { get; set; } }

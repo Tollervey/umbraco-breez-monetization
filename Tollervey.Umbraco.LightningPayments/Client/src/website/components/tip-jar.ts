@@ -37,6 +37,8 @@ export class BreezTipJarElement extends LitElement {
  // realtime
  private _evtSrc?: EventSource;
  @state() private _thanks = false;
+ private _pollTimer: number | null = null;
+ private readonly _pollMs =2000;
 
  connectedCallback(): void {
  super.connectedCallback();
@@ -48,6 +50,7 @@ export class BreezTipJarElement extends LitElement {
  disconnectedCallback(): void {
  super.disconnectedCallback();
  if (this._evtSrc) { this._evtSrc.close(); this._evtSrc = undefined; }
+ if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
  }
 
  private _connectRealtime() {
@@ -61,6 +64,7 @@ export class BreezTipJarElement extends LitElement {
  if (data?.paymentHash && data.paymentHash === this._paymentHash) {
  this._thanks = true;
  this._modalOpen = false;
+ this._stopPolling();
  // Optionally refresh stats
  this.loadStats();
  }
@@ -69,6 +73,28 @@ export class BreezTipJarElement extends LitElement {
  this._evtSrc.onerror = () => { /* keep connection alive */ };
  } catch { /* ignore */ }
  }
+
+ private _startPolling() {
+ this._stopPolling();
+ if (!this._paymentHash) return;
+ this._pollTimer = window.setInterval(async () => {
+ try {
+ const res = await fetch(`/api/public/lightning/GetPaymentStatusByHash?paymentHash=${encodeURIComponent(this._paymentHash!)}`);
+ if (!res.ok) return;
+ const data = await res.json();
+ const s = (data?.status || '').toLowerCase();
+ if (s === 'paid') {
+ this._thanks = true;
+ this._modalOpen = false;
+ this._stopPolling();
+ // Optionally refresh stats
+ this.loadStats();
+ }
+ } catch { /* ignore transient */ }
+ }, this._pollMs);
+ }
+
+ private _stopPolling() { if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; } }
 
  private async loadStats() {
  const url = this.contentId ? `/api/public/lightning/GetTipStats?contentId=${this.contentId}` : `/api/public/lightning/GetTipStats`;
@@ -100,6 +126,7 @@ export class BreezTipJarElement extends LitElement {
  this._bolt11 = data.invoice;
  this._paymentHash = data.paymentHash;
  this._modalOpen = true;
+ this._startPolling();
  } catch (err: any) {
  this._error = err?.message ?? 'Failed to create tip invoice';
  } finally {
@@ -133,7 +160,7 @@ export class BreezTipJarElement extends LitElement {
  .description=${this.description}
  .invoice=${this._bolt11}
  .paymentHash=${this._paymentHash}
- @close=${() => this._modalOpen = false}
+ @close=${() => { this._modalOpen = false; }}
  ></breez-payment-modal>
  `;
  }
