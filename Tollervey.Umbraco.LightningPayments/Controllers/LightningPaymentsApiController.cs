@@ -114,6 +114,106 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         }
 
         /// <summary>
+        /// Manually confirms a payment by its hash.
+        /// </summary>
+        [HttpPost("ConfirmPayment")]
+        public async Task<IActionResult> ConfirmPayment([FromBody] PaymentHashRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            try
+            {
+                var result = await _paymentStateService.ConfirmPaymentAsync(request.PaymentHash);
+                return result switch
+                {
+                    PaymentConfirmationResult.Confirmed => Ok(new { status = "confirmed" }),
+                    PaymentConfirmationResult.AlreadyConfirmed => Ok(new { status = "already_confirmed" }),
+                    _ => NotFound(new { status = "not_found" })
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error confirming payment {PaymentHash}", request.PaymentHash);
+                return StatusCode(500, "An error occurred while confirming the payment.");
+            }
+        }
+
+        /// <summary>
+        /// Marks a payment as failed by its hash.
+        /// </summary>
+        [HttpPost("MarkAsFailed")]
+        public async Task<IActionResult> MarkAsFailed([FromBody] PaymentHashRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            try
+            {
+                var updated = await _paymentStateService.MarkAsFailedAsync(request.PaymentHash);
+                return updated ? Ok(new { status = "failed" }) : NotFound(new { status = "not_found" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking payment as failed {PaymentHash}", request.PaymentHash);
+                return StatusCode(500, "An error occurred while updating the payment.");
+            }
+        }
+
+        /// <summary>
+        /// Marks a payment as expired by its hash.
+        /// </summary>
+        [HttpPost("MarkAsExpired")]
+        public async Task<IActionResult> MarkAsExpired([FromBody] PaymentHashRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            try
+            {
+                var updated = await _paymentStateService.MarkAsExpiredAsync(request.PaymentHash);
+                return updated ? Ok(new { status = "expired" }) : NotFound(new { status = "not_found" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking payment as expired {PaymentHash}", request.PaymentHash);
+                return StatusCode(500, "An error occurred while updating the payment.");
+            }
+        }
+
+        /// <summary>
+        /// Marks a payment as refund pending by its hash.
+        /// </summary>
+        [HttpPost("MarkAsRefundPending")]
+        public async Task<IActionResult> MarkAsRefundPending([FromBody] PaymentHashRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            try
+            {
+                var updated = await _paymentStateService.MarkAsRefundPendingAsync(request.PaymentHash);
+                return updated ? Ok(new { status = "refund_pending" }) : NotFound(new { status = "not_found" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking payment as refund pending {PaymentHash}", request.PaymentHash);
+                return StatusCode(500, "An error occurred while updating the payment.");
+            }
+        }
+
+        /// <summary>
+        /// Marks a payment as refunded by its hash.
+        /// </summary>
+        [HttpPost("MarkAsRefunded")]
+        public async Task<IActionResult> MarkAsRefunded([FromBody] PaymentHashRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.PaymentHash)) return BadRequest("Invalid payment hash.");
+            try
+            {
+                var updated = await _paymentStateService.MarkAsRefundedAsync(request.PaymentHash);
+                return updated ? Ok(new { status = "refunded" }) : NotFound(new { status = "not_found" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking payment as refunded {PaymentHash}", request.PaymentHash);
+                return StatusCode(500, "An error occurred while updating the payment.");
+            }
+        }
+
+        /// <summary>
         /// Generates a Lightning Network invoice for paywall access to a specific content item.
         /// </summary>
         /// <param name="contentId">The ID of the Umbraco content item requiring payment.</param>
@@ -395,5 +495,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     {
         public ulong AmountSat { get; set; }
         public string? Description { get; set; }
+    }
+
+    public sealed class PaymentHashRequest
+    {
+        public string PaymentHash { get; set; } = string.Empty;
     }
 }
