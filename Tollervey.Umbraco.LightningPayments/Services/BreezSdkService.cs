@@ -481,6 +481,71 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <summary>
+        /// Attempts to extract the expiry time of an invoice (if present) as a UTC DateTimeOffset.
+        ///
+        /// UI guidance:
+        /// - Use this to show/hide a countdown timer for payment expiry in the UI.
+        /// - Consider enhancing with on-chain confirmation checks for critical payments.
+        ///
+        /// References:
+        /// - https://sdk-doc-liquid.breez.technology/guide/uxguide_display.html
+        /// </summary>
+        public async Task<DateTimeOffset?> TryExtractInvoiceExpiryAsync(string invoice, CancellationToken ct = default)
+        {
+            var sdk = await _sdkInstance.Value.WaitAsync(ct);
+            if (sdk == null)
+            {
+                _logger.LogWarning("Breez SDK not connected; cannot parse invoice expiry.");
+                return null;
+            }
+            try
+            {
+                var parsed = await _wrapper.ParseAsync(sdk, invoice, ct);
+                if (parsed is InputType.Bolt11 bolt11)
+                {
+                    var inv = bolt11.invoice;
+                    // Try common shapes via reflection to avoid tight coupling to binding versions
+                    // Prefer absolute expiry (unix seconds)
+                    var invType = inv.GetType();
+                    long TryGetLongProp(string name)
+                    {
+                        var p = invType.GetProperty(name);
+                        if (p == null) return 0;
+                        var v = p.GetValue(inv);
+                        if (v == null) return 0;
+                        try { return Convert.ToInt64(v); } catch { return 0; }
+                    }
+
+                    var expiryUnix = TryGetLongProp("expiryTime"); // absolute epoch seconds
+                    if (expiryUnix > 0)
+                    {
+                        return DateTimeOffset.FromUnixTimeSeconds(expiryUnix);
+                    }
+
+                    // Derive from creation timestamp + ttl
+                    var createdUnix = TryGetLongProp("timestamp");
+                    var ttl = TryGetLongProp("expiry"); // seconds from creation
+                    if (createdUnix > 0 && ttl > 0)
+                    {
+                        return DateTimeOffset.FromUnixTimeSeconds(createdUnix + ttl);
+                    }
+
+                    // Some bindings may expose `expiresAt`
+                    var expiresAt = TryGetLongProp("expiresAt");
+                    if (expiresAt > 0)
+                    {
+                        return DateTimeOffset.FromUnixTimeSeconds(expiresAt);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to parse invoice expiry.");
+            }
+            return null;
+        }
+
         internal class SdkLogger : Logger
         {
             private readonly ILogger<BreezSdkService> _logger;

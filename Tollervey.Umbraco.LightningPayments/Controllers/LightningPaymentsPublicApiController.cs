@@ -68,9 +68,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
  public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
  {
- if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
  var rate = CheckRate("paywall");
  if (!rate.Allowed) { Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString(); return Error(StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests. Please try again shortly."); }
+ if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
  try
  {
  var (content, paywallConfig) = _invoiceHelper.GetContentAndPaywallConfig(contentId);
@@ -80,7 +80,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
  var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
  await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
- return Ok(new { invoice, paymentHash });
+ var expiry = await _invoiceHelper.TryGetInvoiceExpiryAsync(invoice);
+ return Ok(new { invoice, paymentHash, expiry });
  }
  catch (InvalidInvoiceRequestException ex) { _logger.LogWarning(ex, "Invalid invoice request for content {ContentId}", contentId); return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message); }
  catch (Exception ex) { _logger.LogError(ex, "Error generating paywall invoice for contentId {ContentId}", contentId); return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the invoice."); }
@@ -162,7 +163,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
  await _paymentStateService.AddPendingPaymentAsync(paymentHash, request.ContentId ??0, sessionId);
  await _paymentStateService.SetPaymentMetadataAsync(paymentHash, request.AmountSat, PaymentKind.Tip);
- return Ok(new { invoice, paymentHash });
+ var expiry = await _invoiceHelper.TryGetInvoiceExpiryAsync(invoice);
+ return Ok(new { invoice, paymentHash, expiry });
  }
  catch (Exception ex) { _logger.LogError(ex, "Error creating tip invoice for amount {Amount}", request.AmountSat); return StatusCode(500, "An error occurred while creating the tip invoice."); }
  }

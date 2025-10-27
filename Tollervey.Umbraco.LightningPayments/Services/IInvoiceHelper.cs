@@ -21,6 +21,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description);
  string EnsureSessionCookie(HttpRequest request, HttpResponse response, string? explicitState = null);
  IActionResult BuildLnurlPayInfo(int contentId, HttpRequest request, string callbackPath, ILogger logger);
+ Task<DateTimeOffset?> TryGetInvoiceExpiryAsync(string invoice, CancellationToken ct = default);
  }
 
  internal sealed class InvoiceHelper : IInvoiceHelper
@@ -126,6 +127,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  logger.LogError(ex, "Error generating LNURL-Pay info for contentId {ContentId}", contentId);
  return new ObjectResult(new { status = "ERROR", reason = "An error occurred while generating LNURL-Pay info." }) { StatusCode =500 };
  }
+ }
+
+ public Task<DateTimeOffset?> TryGetInvoiceExpiryAsync(string invoice, CancellationToken ct = default)
+ {
+ return _breezSdkService.TryExtractInvoiceExpiryAsync(invoice, ct);
  }
  }
 }
