@@ -39,7 +39,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
                     return new BadRequestObjectResult("Paywall is not enabled or fee is not set.");
                 }
 
-                var callback = $"{request.Scheme}://{request.Host}{callbackPath}?contentId={contentId}";
+                // Ensure we have a stable browser session identifier and put it on the callback as `state`.
+                // This is required because LNURL callbacks are performed by the wallet (not the browser),
+                // so cookies will not be sent back. Passing `state` lets us associate the pending payment
+                // with the user's browser session for later unlock checks.
+                var existingSession = request.Cookies[Middleware.PaywallMiddleware.PaywallCookieName];
+                var sessionId = string.IsNullOrWhiteSpace(existingSession) ? Guid.NewGuid().ToString() : existingSession;
+                if (string.IsNullOrWhiteSpace(existingSession))
+                {
+                    request.HttpContext.Response.Cookies.Append(
+                        Middleware.PaywallMiddleware.PaywallCookieName,
+                        sessionId,
+                        new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict }
+                    );
+                }
+
+                var callback = $"{request.Scheme}://{request.Host}{callbackPath}?contentId={contentId}&state={Uri.EscapeDataString(sessionId)}";
                 var metadata = $"""[[\"text/plain\",\"Access to {content.Name}\"]]""";
                 ulong minSendable = paywallConfig.Fee * 1000UL;
                 ulong maxSendable = minSendable;

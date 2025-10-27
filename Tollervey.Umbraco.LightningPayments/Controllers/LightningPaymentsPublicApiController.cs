@@ -140,7 +140,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  /// LNURL-Pay callback to create a Bolt11 invoice (anonymous). Amount is in millisats.
  /// </summary>
  [HttpGet("GetLnurlInvoice")]
- public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId)
+ public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId, [FromQuery] string? state = null)
  {
  if (contentId <=0)
  {
@@ -176,7 +176,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  return BadRequest("Failed to obtain invoice payment hash.");
  }
 
- var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
+ // When called from wallets, our cookie-based session does not flow. If a `state` was provided by
+ // our LNURL metadata, use it to associate the pending payment with the user's browser session.
+ string sessionId = !string.IsNullOrWhiteSpace(state) ? state! : (Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString());
  Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions
  {
  HttpOnly = true,

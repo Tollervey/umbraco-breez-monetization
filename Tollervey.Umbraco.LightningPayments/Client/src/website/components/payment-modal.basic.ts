@@ -28,8 +28,9 @@ export class BreezPaymentModalBasic extends LitElement {
  };
 
  async _generateInvoice() {
- if (!this.contentId || this.amount <=0) {
- this._error = 'Missing content id or amount';
+ // For paywall invoices, the server determines amount from content config. Only require contentId.
+ if (!this.contentId || this.contentId <=0) {
+ this._error = 'Missing or invalid content id';
  return;
  }
  this._loading = true;
