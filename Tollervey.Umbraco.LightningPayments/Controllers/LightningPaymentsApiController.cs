@@ -30,6 +30,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         private readonly ILogger<LightningPaymentsApiController> _logger;
         private readonly IUserService _userService;
         private readonly ILightningPaymentsRuntimeMode _runtimeMode;
+        private readonly IBreezPaymentsFacade _paymentsFacade;
 
         private static readonly Regex OfflineHashRegex = new(@"(?:^|-)p=([0-9a-f]{64})(?:-|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -39,7 +40,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         IUmbracoContextFactory umbracoContextFactory,
         ILogger<LightningPaymentsApiController> logger,
         IUserService userService,
-        ILightningPaymentsRuntimeMode runtimeMode)
+        ILightningPaymentsRuntimeMode runtimeMode,
+        IBreezPaymentsFacade paymentsFacade)
         {
             _breezSdkService = breezSdkService;
             _paymentStateService = paymentStateService;
@@ -47,6 +49,68 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             _logger = logger;
             _userService = userService;
             _runtimeMode = runtimeMode;
+            _paymentsFacade = paymentsFacade;
+        }
+
+        /// <summary>
+        /// Gets the connection status of the Breez SDK.
+        /// </summary>
+        [HttpGet("GetStatus")]
+        public async Task<IActionResult> GetStatus()
+        {
+            var connected = await _breezSdkService.IsConnectedAsync();
+            return Ok(new { connected, offlineMode = _runtimeMode.IsOffline });
+        }
+
+        /// <summary>
+        /// Gets the Lightning Network receive limits from the Breez SDK.
+        /// </summary>
+        [HttpGet("GetLightningReceiveLimits")]
+        public async Task<IActionResult> GetLightningReceiveLimits()
+        {
+            var limits = await _paymentsFacade.FetchLightningLimitsAsync();
+            if (limits == null) return BadRequest("Breez SDK not connected.");
+            return Ok(new { minSat = limits.receive.minSat, maxSat = limits.receive.maxSat });
+        }
+
+        /// <summary>
+        /// Gets the recommended fees from the Breez SDK.
+        /// </summary>
+        [HttpGet("GetRecommendedFees")]
+        public async Task<IActionResult> GetRecommendedFees()
+        {
+            var fees = await _breezSdkService.GetRecommendedFeesAsync();
+            if (fees == null) return Ok(new { });
+            return Ok(fees);
+        }
+
+        /// <summary>
+        /// Creates a test invoice with the specified amount and description.
+        /// </summary>
+        [HttpPost("CreateTestInvoice")]
+        public async Task<IActionResult> CreateTestInvoice([FromBody] TestInvoiceRequest request)
+        {
+            if (request == null || request.AmountSat <=0) return BadRequest("Invalid amount.");
+            try
+            {
+                var invoice = await _breezSdkService.CreateInvoiceAsync(request.AmountSat, string.IsNullOrWhiteSpace(request.Description) ? "Test invoice" : request.Description!);
+                var paymentHash = await TryGetPaymentHash(invoice);
+                if (string.IsNullOrWhiteSpace(paymentHash))
+                {
+                    return BadRequest("Failed to obtain invoice payment hash.");
+                }
+                return Ok(new { invoice, paymentHash });
+            }
+            catch (InvalidInvoiceRequestException ex)
+            {
+                _logger.LogWarning(ex, "Invalid request for test invoice.");
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating test invoice.");
+                return StatusCode(500, "An error occurred while creating the invoice.");
+            }
         }
 
         /// <summary>
@@ -57,7 +121,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [HttpGet("GetPaywallInvoice")]
         public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
         {
-            if (contentId <= 0)
+            if (contentId <=0)
             {
                 return BadRequest("Invalid content ID.");
             }
@@ -71,7 +135,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                     return NotFound("Content or paywall configuration not found.");
                 }
 
-                if (!paywallConfig.Enabled || paywallConfig.Fee == 0)
+                if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
                 {
                     return BadRequest("Paywall is not enabled or fee is not set.");
                 }
@@ -325,5 +389,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
             return null;
         }
+    }
+
+    public sealed class TestInvoiceRequest
+    {
+        public ulong AmountSat { get; set; }
+        public string? Description { get; set; }
     }
 }
