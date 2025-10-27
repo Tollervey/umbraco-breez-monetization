@@ -39,9 +39,29 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   @state() private invoiceQrDataUrl: string | null = null;
   @state() private invoiceError = "";
 
+  // New: refresh tools
+  @state() private autoRefresh = false;
+  private refreshTimer: number | null = null;
+  private readonly refreshIntervalMs = 10000;
+  @state() private refreshing = false;
+
+  // New: copy feedback
+  @state() private copyOk = false;
+
   constructor() {
     super();
     this.loadAll();
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Autostart refresh if already enabled (persisting state is out of scope)
+    if (this.autoRefresh) this.startAutoRefresh();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stopAutoRefresh();
   }
 
   private async loadAll() {
@@ -161,6 +181,45 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     }
   }
 
+  private onRefreshClick = async () => {
+    this.refreshing = true;
+    try {
+      await this.loadAll();
+    } finally {
+      this.refreshing = false;
+    }
+  };
+
+  private toggleAutoRefresh = (e: Event) => {
+    const checked = (e.target as HTMLInputElement).checked;
+    this.autoRefresh = checked;
+    if (checked) this.startAutoRefresh();
+    else this.stopAutoRefresh();
+  };
+
+  private startAutoRefresh() {
+    this.stopAutoRefresh();
+    this.refreshTimer = window.setInterval(() => this.loadAll(), this.refreshIntervalMs);
+  }
+
+  private stopAutoRefresh() {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  private async copyInvoice() {
+    if (!this.createdInvoice) return;
+    try {
+      await navigator.clipboard.writeText(this.createdInvoice);
+      this.copyOk = true;
+      setTimeout(() => (this.copyOk = false), 1500);
+    } catch (err) {
+      console.warn("Copy failed", err);
+    }
+  }
+
   render() {
     return html`
       <umb-body-layout header-transparent>
@@ -179,6 +238,13 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   private renderStatus() {
     return html`
       <uui-box headline="Status" style="margin-bottom: var(--uui-size-layout-1)">
+        <div class="toolbar">
+          <uui-button look="secondary" @click=${this.onRefreshClick} ?disabled=${this.refreshing}>${this.refreshing ? "Refreshing…" : "Refresh"}</uui-button>
+          <label class="auto">
+            <input type="checkbox" .checked=${this.autoRefresh} @change=${this.toggleAutoRefresh} />
+            <span>Auto-refresh</span>
+          </label>
+        </div>
         ${this.loadingStatus
           ? html`<div>Loading status…</div>`
           : this.errorStatus
@@ -203,6 +269,7 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   }
 
   private renderTestTools() {
+    const lightningUri = this.createdInvoice ? `lightning:${this.createdInvoice}` : null;
     return html`
       <uui-box headline="Test invoice" style="margin-bottom: var(--uui-size-layout-1)">
         <div class="test-grid">
@@ -250,6 +317,12 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
                     readonly
                     .value=${this.createdInvoice}
                   ></uui-textarea>
+                  <div class="actions">
+                    <uui-button look="secondary" @click=${this.copyInvoice}>${this.copyOk ? "Copied" : "Copy"}</uui-button>
+                    ${lightningUri
+                      ? html`<a class="open-wallet" href="${lightningUri}">Open in wallet</a>`
+                      : ""}
+                  </div>
                   <div class="hash">Payment hash: ${this.createdPaymentHash?.slice(0, 12)}…</div>
                 </div>
               </div>
@@ -309,6 +382,20 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
         margin-top: 0;
       }
 
+      .toolbar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+
+      .auto {
+        display: flex;
+        gap: 0.35rem;
+        align-items: center;
+        color: var(--uui-color-text);
+      }
+
       .status-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -349,6 +436,21 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
       .invoice-text uui-textarea {
         width: 100%;
         height: 120px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-top: 0.5rem;
+      }
+
+      .open-wallet {
+        text-decoration: none;
+        background: var(--uui-color-highlight);
+        color: var(--uui-color-surface);
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
       }
 
       .hash {
