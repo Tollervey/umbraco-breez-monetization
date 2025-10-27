@@ -165,6 +165,13 @@ export class BreezPaymentModalBasic extends LitElement {
  if (this.open) {
  this._previouslyFocused = (this.getRootNode() as Document | ShadowRoot).activeElement as Element | null;
  this._lockScroll(true);
+ // Reset transient state when opening, unless a pre-supplied invoice is provided
+ if (!this.invoice) {
+ this._invoice = undefined;
+ this.expiry = undefined;
+ this._remaining = '';
+ }
+ this._error = '';
  // Defer to ensure DOM is rendered
  setTimeout(() => this._focusInitial(),0);
  this.addEventListener('keydown', this._onKeyDown);
@@ -185,6 +192,14 @@ export class BreezPaymentModalBasic extends LitElement {
  this.dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: this.paymentHash }, bubbles: true, composed: true }));
  }
  }
+ }
+
+ disconnectedCallback(): void {
+ super.disconnectedCallback();
+ // Safety: ensure no locks or listeners remain if element is removed while open
+ this.removeEventListener('keydown', this._onKeyDown);
+ this._clearCountdown();
+ this._lockScroll(false);
  }
 
  render() {
