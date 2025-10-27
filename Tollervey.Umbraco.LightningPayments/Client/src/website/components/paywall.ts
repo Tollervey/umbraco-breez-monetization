@@ -21,9 +21,11 @@ export class BreezPaywallElement extends LitElement {
  @state() private _modalOpen: boolean = false;
 
  private _evtSrc?: EventSource;
+ private _pollTimer: number | null = null;
+ private readonly _pollMs =2000;
 
  connectedCallback(): void { super.connectedCallback(); this._checkStatus(); this._connectRealtime(); }
- disconnectedCallback(): void { super.disconnectedCallback(); this._evtSrc?.close(); this._evtSrc = undefined; }
+ disconnectedCallback(): void { super.disconnectedCallback(); this._evtSrc?.close(); this._evtSrc = undefined; this._stopPolling(); }
 
  private _connectRealtime() {
  try {
@@ -35,6 +37,7 @@ export class BreezPaywallElement extends LitElement {
  if (typeof data?.contentId === 'number' && data.contentId === this.contentId) {
  this._status = 'paid';
  this._modalOpen = false;
+ this._stopPolling();
  }
  } catch { /* ignore */ }
  });
@@ -53,13 +56,36 @@ export class BreezPaywallElement extends LitElement {
  finally { this._loading = false; if (this._status === 'paid') { this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true })); } }
  }
 
- private _openModal() { this._modalOpen = true; this._status = 'pending'; }
- private _closeModal = () => { this._modalOpen = false; };
- private _onInvoiceGenerated = (_e: CustomEvent) => { this._status = 'pending'; };
+ private _startPolling() {
+ this._stopPolling();
+ if (!this.contentId || this.contentId <=0) return;
+ this._pollTimer = window.setInterval(async () => {
+ try {
+ const res = await fetch(`/api/public/lightning/GetPaymentStatus?contentId=${this.contentId}`);
+ if (!res.ok) return;
+ const data = await res.json();
+ const s = (data?.status || '').toLowerCase();
+ if (s === 'paid') {
+ this._status = 'paid';
+ this._modalOpen = false;
+ this._stopPolling();
+ this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true }));
+ }
+ } catch { /* ignore transient */ }
+ }, this._pollMs);
+ }
+
+ private _stopPolling() {
+ if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
+ }
+
+ private _openModal() { this._modalOpen = true; this._status = 'pending'; this._startPolling(); }
+ private _closeModal = () => { this._modalOpen = false; /* keep polling while pending in background? keep for robustness */ };
+ private _onInvoiceGenerated = (_e: CustomEvent) => { this._status = 'pending'; this._startPolling(); };
 
  render() {
  if (this._status === 'paid') { return html`<slot></slot>`; }
- if (this._loading || this._status === 'unknown') { return html`<div class="breez-paywall loading" role="status" aria-live="polite">${this.checkingLabel}</div>`; }
+ if this._loading || this._status === 'unknown' { return html`<div class="breez-paywall loading" role="status" aria-live="polite">${this.checkingLabel}</div>`; }
  const problem = this._status === 'failed' ? this.failedLabel : this._status === 'expired' ? this.expiredLabel : '';
  return html`
  <div class="breez-paywall ${this._status}">
