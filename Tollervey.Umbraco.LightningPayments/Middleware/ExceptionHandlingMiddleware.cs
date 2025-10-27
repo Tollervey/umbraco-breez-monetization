@@ -11,6 +11,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
 
         private static readonly PathString BackofficePrefix = new("/umbraco");
         private static readonly PathString PaywallSurfacePrefix = new("/umbraco/surface/paywallsurface");
+        private static readonly PathString ApiPrefix = new("/api");
 
         public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
         {
@@ -20,7 +21,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
-            // Only handle public website requests; let backoffice/management and our own surface handle themselves
+            // Only handle public website requests; let backoffice/management and APIs handle themselves
             if (ShouldBypass(context))
             {
                 await _next(context);
@@ -85,6 +86,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
                 return true;
 
             if (path.StartsWithSegments(BackofficePrefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Bypass all /api/* routes (public and management controllers handle JSON envelopes themselves)
+            if (path.StartsWithSegments(ApiPrefix, StringComparison.OrdinalIgnoreCase))
                 return true;
 
             return false;
