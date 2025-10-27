@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Hosting;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Services;
@@ -23,6 +25,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
             // Ensure BreezSdkService is tied to Umbraco app lifecycle
             builder.Components().Append<BreezSdkComponent>();
 
+            // Swagger (dev-only): registers services; UI is enabled later in pipeline.
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "Lightning Payments API",
+                    Version = "v1",
+                    Description = "Public and Management endpoints for Breez-powered Lightning paywalls and tips."
+                });
+            });
+
             // Register middleware using Umbraco pipeline filters (applies to both pipelines in v16).
             builder.Services.Configure<UmbracoPipelineOptions>(options =>
             {
@@ -34,6 +48,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
                         // Order matters: exception handler first to wrap paywall.
                         app.UseMiddleware<ExceptionHandlingMiddleware>();
                         app.UseMiddleware<PaywallMiddleware>();
+
+                        var env = app.ApplicationServices.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>();
+                        if (env.IsDevelopment())
+                        {
+                            app.UseSwagger();
+                            app.UseSwaggerUI(setup =>
+                            {
+                                setup.SwaggerEndpoint("/swagger/v1/swagger.json", "Lightning Payments API v1");
+                                setup.RoutePrefix = "swagger";
+                            });
+                        }
                     },
                     // Map health checks in the Endpoints stage.
                     Endpoints = app =>
