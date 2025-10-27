@@ -11,6 +11,7 @@ using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
+using Tollervey.Umbraco.LightningPayments.UI.Services.RateLimiting;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
@@ -29,6 +30,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  private readonly IUmbracoContextFactory _umbracoContextFactory;
  private readonly ILogger<LightningPaymentsPublicApiController> _logger;
  private readonly ILightningPaymentsRuntimeMode _runtimeMode;
+ private readonly IRateLimiter _rateLimiter;
 
  private static readonly Regex OfflineHashRegex = new(@"(?:^|-)p=([0-9a-f]{64})(?:-|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -37,18 +39,30 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  IPaymentStateService paymentStateService,
  IUmbracoContextFactory umbracoContextFactory,
  ILogger<LightningPaymentsPublicApiController> logger,
- ILightningPaymentsRuntimeMode runtimeMode)
+ ILightningPaymentsRuntimeMode runtimeMode,
+ IRateLimiter rateLimiter)
  {
  _breezSdkService = breezSdkService;
  _paymentStateService = paymentStateService;
  _umbracoContextFactory = umbracoContextFactory;
  _logger = logger;
  _runtimeMode = runtimeMode;
+ _rateLimiter = rateLimiter;
  }
 
  private IActionResult Error(int statusCode, string error, string message)
  {
  return StatusCode(statusCode, new ApiError { error = error, message = message });
+ }
+
+ private (bool Allowed, TimeSpan RetryAfter) CheckRate(string endpointKey)
+ {
+ var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+ var session = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? "anon";
+ var key = $"{endpointKey}:{ip}:{session}";
+ // defaults:5 requests /30 seconds
+ var allowed = _rateLimiter.TryConsume(key, limit:5, window: TimeSpan.FromSeconds(30), out var retry);
+ return (allowed, retry);
  }
 
  /// <summary>
@@ -61,6 +75,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
  public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
  {
+ var rate = CheckRate("paywall");
+ if (!rate.Allowed)
+ {
+ Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString();
+ return Error(StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests. Please try again shortly.");
+ }
+
  if (contentId <=0)
  {
  return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
@@ -142,6 +163,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [HttpGet("GetLnurlInvoice")]
  public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId, [FromQuery] string? state = null)
  {
+ var rate = CheckRate("lnurl");
+ if (!rate.Allowed)
+ {
+ Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString();
+ return StatusCode(StatusCodes.Status429TooManyRequests, "Too many requests. Please try again shortly.");
+ }
+
  if (contentId <=0)
  {
  return BadRequest("Invalid content ID.");
@@ -236,6 +264,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [HttpPost("CreateTipInvoice")]
  public async Task<IActionResult> CreateTipInvoice([FromBody] TipInvoiceRequest request)
  {
+ var rate = CheckRate("tip");
+ if (!rate.Allowed)
+ {
+ Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString();
+ return StatusCode(StatusCodes.Status429TooManyRequests, "Too many requests. Please try again shortly.");
+ }
+
  if (request == null || request.AmountSat <=0)
  {
  return BadRequest("Invalid amount.");

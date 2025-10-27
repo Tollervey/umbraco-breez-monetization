@@ -7,6 +7,7 @@ using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
 using Tollervey.Umbraco.LightningPayments.UI.Services.Realtime;
+using Tollervey.Umbraco.LightningPayments.UI.Services.RateLimiting;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -56,6 +57,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Realtime hub (SSE)
             builder.Services.AddSingleton<SseHub>();
+
+            // Rate limiter
+            builder.Services.AddSingleton<IRateLimiter, MemoryRateLimiter>();
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
