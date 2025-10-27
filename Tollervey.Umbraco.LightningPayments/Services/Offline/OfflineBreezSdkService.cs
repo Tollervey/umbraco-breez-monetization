@@ -89,6 +89,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         public Task<Breez.Sdk.Liquid.Payment?> GetPaymentByHashAsync(string paymentHash, CancellationToken ct = default)
             => Task.FromResult<Breez.Sdk.Liquid.Payment?>(null);
 
+        // New: offline impl does not embed expiry; return null to indicate unknown
+        public Task<DateTimeOffset?> TryExtractInvoiceExpiryAsync(string invoice, CancellationToken ct = default)
+            => Task.FromResult<DateTimeOffset?>(null);
+
         public ValueTask DisposeAsync()
         {
             _cts.Cancel();

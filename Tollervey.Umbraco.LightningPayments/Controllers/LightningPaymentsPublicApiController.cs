@@ -193,6 +193,29 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  if (state == null) return Ok(new { status = "not_found" });
  return Ok(new { status = state.Status.ToString() });
  }
+
+ /// <summary>
+ /// Returns a fee quote (in sats) for receiving the paywall amount for a content item (anonymous).
+ /// </summary>
+ [HttpGet("GetPaywallReceiveFeeQuote")]
+ [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+ [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+ [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
+ public async Task<IActionResult> GetPaywallReceiveFeeQuote([FromQuery] int contentId, [FromQuery] bool bolt12 = false)
+ {
+ var rate = CheckRate("feequote");
+ if (!rate.Allowed) { Response.Headers["Retry-After"] = Math.Ceiling(rate.RetryAfter.TotalSeconds).ToString(); return Error(StatusCodes.Status429TooManyRequests, "rate_limited", "Too many requests. Please try again shortly."); }
+ if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
+ try
+ {
+ var (_, paywallConfig) = _invoiceHelper.GetContentAndPaywallConfig(contentId);
+ if (paywallConfig == null || !paywallConfig.Enabled || paywallConfig.Fee ==0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
+ var feesSat = await _breezSdkService.GetReceiveFeeQuoteAsync(paywallConfig.Fee, bolt12);
+ return Ok(new { amountSat = paywallConfig.Fee, feesSat, method = bolt12 ? "bolt12" : "bolt11" });
+ }
+ catch (InvalidInvoiceRequestException ex) { _logger.LogWarning(ex, "Invalid request for public fee quote."); return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message); }
+ catch (Exception ex) { _logger.LogError(ex, "Error fetching public receive fee quote for contentId {ContentId}", contentId); return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while fetching the fee quote."); }
+ }
  }
 
  public class TipInvoiceRequest { public ulong AmountSat { get; set; } public int? ContentId { get; set; } public string? Label { get; set; } }

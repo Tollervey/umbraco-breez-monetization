@@ -53,7 +53,7 @@ export class BreezPaywallElement extends LitElement {
  if (!res.ok) { if (res.status ===401) { this._status = 'unpaid'; } else { throw new Error(`HTTP ${res.status}`); } }
  else { const data = await res.json(); const s = (data?.status || '').toLowerCase(); this._status = s === 'paid' ? 'paid' : s === 'failed' ? 'failed' : s === 'expired' ? 'expired' : 'unpaid'; }
  } catch (err: any) { console.error('Failed to check payment status', err); this._error = err?.message ?? 'Failed to check payment status'; }
- finally { this._loading = false; if (this._status === 'paid') { this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true })); } }
+ finally { this._loading = false; if (this._status === 'paid') { (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true })); } }
  }
 
  private _startPolling() {
@@ -69,7 +69,7 @@ export class BreezPaywallElement extends LitElement {
  this._status = 'paid';
  this._modalOpen = false;
  this._stopPolling();
- this.dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true }));
+ (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('breez-unlocked', { bubbles: true, composed: true }));
  }
  } catch { /* ignore transient */ }
  }, this._pollMs);
@@ -84,8 +84,12 @@ export class BreezPaywallElement extends LitElement {
  private _onInvoiceGenerated = (_e: CustomEvent) => { this._status = 'pending'; this._startPolling(); };
 
  render() {
- if (this._status === 'paid') { return html`<slot></slot>`; }
- if this._loading || this._status === 'unknown' { return html`<div class="breez-paywall loading" role="status" aria-live="polite">${this.checkingLabel}</div>`; }
+ if (this._status === 'paid') {
+ return html`<slot></slot>`;
+ }
+ if (this._loading || this._status === 'unknown') {
+ return html`<div class="breez-paywall loading" role="status" aria-live="polite">${this.checkingLabel}</div>`;
+ }
  const problem = this._status === 'failed' ? this.failedLabel : this._status === 'expired' ? this.expiredLabel : '';
  return html`
  <div class="breez-paywall ${this._status}">
@@ -95,19 +99,27 @@ export class BreezPaywallElement extends LitElement {
  ? html`<button class="primary" @click=${this._openModal}>${this.buttonLabel}</button>`
  : html`<div class="pending" role="status" aria-live="polite">${this.waitingLabel}</div>`}
  </div>
- <breez-payment-modal .open=${this._modalOpen} .contentId=${this.contentId} .amount=${0} .title=${this.title} .description=${this.description} @close=${this._closeModal} @invoice-generated=${this._onInvoiceGenerated}></breez-payment-modal>
+ <breez-payment-modal
+ .open=${this._modalOpen}
+ .contentId=${this.contentId}
+ .amount=${0}
+ .title=${this.title}
+ .description=${this.description}
+ @close=${this._closeModal}
+ @invoice-generated=${this._onInvoiceGenerated}
+ ></breez-payment-modal>
  `;
  }
 
  static styles = css`
  :host { display: block; }
  .breez-paywall { display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; }
- .loading { color:#666; }
- .pending { color:#666; }
- .warning { color:#a15c00; }
- .error { color:#b00020; }
- .primary { background:#f89c1c; border:0; color:white; padding:0.5rem0.9rem; border-radius:6px; cursor:pointer; }
- .primary:hover { background:#e68a0a; }
+ .loading { color: var(--lp-color-text-muted); }
+ .pending { color: var(--lp-color-text-muted); }
+ .warning { color: #a15c00; }
+ .error { color: var(--lp-color-danger); }
+ .primary { background: var(--lp-color-primary); border:0; color: var(--lp-color-bg); padding:0.5rem0.9rem; border-radius: var(--lp-radius); cursor:pointer; }
+ .primary:hover { background: var(--lp-color-primary-hover); }
  `;
 }
 

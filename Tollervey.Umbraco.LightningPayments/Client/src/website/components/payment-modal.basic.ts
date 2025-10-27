@@ -26,6 +26,9 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String, attribute: 'create-error-label' }) createErrorLabel = 'Failed to create invoice';
  @property({ type: String, attribute: 'expires-in-label' }) expiresInLabel = 'Expires in';
  @property({ type: String, attribute: 'expired-label' }) expiredLabel = 'Invoice expired. Generate a new one.';
+ @property({ type: String, attribute: 'fees-label' }) feesLabel = 'Estimated receive fee';
+ @property({ type: String, attribute: 'total-label' }) totalLabel = 'Estimated total';
+ @property({ type: String, attribute: 'estimating-fees-label' }) estimatingFeesLabel = 'Estimating fees…';
 
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
@@ -33,6 +36,12 @@ export class BreezPaymentModalBasic extends LitElement {
  @state() private _remaining = '';
  @state() private _isExpired = false;
  private _countdownTimer: number | null = null;
+
+ // fee quote state (optional; best-effort)
+ @state() private _feeLoading = false;
+ @state() private _feeAmount: number | null = null; // amountSat echoed from API
+ @state() private _feeSat: number | null = null; // feesSat from API
+ @state() private _feeMethod: string | null = null; // bolt11/bolt12 indicator
 
  private _previouslyFocused: Element | null = null;
  private _titleId = `bpm-title-${Math.random().toString(36).slice(2)}`;
@@ -158,6 +167,28 @@ export class BreezPaymentModalBasic extends LitElement {
  await this._generateInvoice();
  }
 
+ private async _loadFeeQuote() {
+ if (!this.contentId || this.contentId <=0) return;
+ this._feeLoading = true;
+ this._feeAmount = null;
+ this._feeSat = null;
+ this._feeMethod = null;
+ try {
+ const res = await fetch(`/api/public/lightning/GetPaywallReceiveFeeQuote?contentId=${this.contentId}`);
+ if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ const data = await res.json();
+ const amt = Number(data?.amountSat);
+ const fees = Number(data?.feesSat);
+ this._feeAmount = Number.isFinite(amt) ? amt : null;
+ this._feeSat = Number.isFinite(fees) ? fees : null;
+ this._feeMethod = typeof data?.method === 'string' ? data.method : null;
+ } catch {
+ // best-effort: ignore errors for fee quote
+ } finally {
+ this._feeLoading = false;
+ }
+ }
+
  async _generateInvoice() {
  if (!this.contentId || this.contentId <=0) {
  this._error = this.missingContentLabel;
@@ -171,7 +202,7 @@ export class BreezPaymentModalBasic extends LitElement {
  const data = await res.json();
  this._invoice = { bolt11: data.invoice, paymentHash: data.paymentHash };
  this.expiry = data.expiry ?? undefined;
- if this.expiry) this._startCountdown();
+ if (this.expiry) this._startCountdown();
  this.dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: data.paymentHash }, bubbles: true, composed: true }));
  } catch (err: any) {
  this._error = err?.message ?? this.createErrorLabel;
@@ -194,6 +225,8 @@ export class BreezPaymentModalBasic extends LitElement {
  setTimeout(() => this._focusInitial(),0);
  this.addEventListener('keydown', this._onKeyDown);
  if (this.expiry) this._startCountdown();
+ // Kick off best-effort fee quote for paywall flows (no pre-supplied invoice)
+ if (!this.invoice) this._loadFeeQuote();
  } else {
  this._lockScroll(false);
  this.removeEventListener('keydown', this._onKeyDown);
@@ -220,6 +253,20 @@ export class BreezPaymentModalBasic extends LitElement {
  this._lockScroll(false);
  }
 
+ private _renderFeeQuote() {
+ if (this._feeLoading) return html`<div class="fees" role="status" aria-live="polite">${this.estimatingFeesLabel}</div>`;
+ if (this._feeAmount != null && this._feeSat != null) {
+ const total = this._feeAmount + this._feeSat;
+ return html`
+ <div class="fees">
+ <div class="row"><span>Amount</span><span><strong>${this._feeAmount.toLocaleString()} sats</strong></span></div>
+ <div class="row"><span>${this.feesLabel}${this._feeMethod ? html` (${this._feeMethod})` : nothing}:</span><span>${this._feeSat.toLocaleString()} sats</span></div>
+ <div class="row total"><span>${this.totalLabel}</span><span><strong>${total.toLocaleString()} sats</strong></span></div>
+ </div>`;
+ }
+ return html``;
+ }
+
  render() {
  if (!this.open) return html``;
  const labelledBy = this._titleId;
@@ -236,6 +283,7 @@ export class BreezPaymentModalBasic extends LitElement {
  ${!this._invoice
  ? html`
  ${this.description ? html`<p id=${this._descId} class="desc">${this.description}</p>` : nothing}
+ ${this._renderFeeQuote()}
  <button class="primary" @click=${this._generateInvoice} ?disabled=${this._loading} aria-busy=${this._loading ? 'true' : 'false'}>
  ${this._loading ? this.generatingLabel : this.generateLabel}
  </button>
@@ -270,6 +318,9 @@ export class BreezPaymentModalBasic extends LitElement {
  .error { color: var(--lp-color-danger); padding:0.5rem0; }
  .desc { color: var(--lp-color-text-muted); }
  .expiry { color: var(--lp-color-text-muted); font-size:0.9rem; }
+ .fees { border: var(--lp-border); border-radius: var(--lp-radius); padding:0.75rem; background: var(--lp-color-surface); color: var(--lp-color-text); }
+ .fees .row { display:flex; justify-content:space-between; gap:0.5rem; padding:0.25rem0; }
+ .fees .row.total { border-top: var(--lp-border); margin-top:0.25rem; padding-top:0.5rem; font-weight:600; }
  `;
 }
 

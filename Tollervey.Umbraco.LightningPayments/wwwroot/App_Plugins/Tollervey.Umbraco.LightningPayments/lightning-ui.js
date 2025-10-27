@@ -1,4 +1,4 @@
-const e = [
+const e = [], a = [
   // Paywall property editor UI
   {
     type: "propertyEditorUi",
@@ -56,7 +56,7 @@ const e = [
       }
     }
   }
-], a = [
+], t = [
   {
     type: "dashboard",
     alias: "lightning-payments-dashboard",
@@ -68,11 +68,12 @@ const e = [
       pathname: "lightning-payments"
     }
   }
-], t = [
+], l = [
   ...e,
-  ...a
+  ...a,
+  ...t
 ];
 export {
-  t as manifests
+  l as manifests
 };
 //# sourceMappingURL=lightning-ui.js.map

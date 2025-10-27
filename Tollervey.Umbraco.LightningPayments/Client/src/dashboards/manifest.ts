@@ -1,4 +1,4 @@
-export const manifests: Array<UmbExtensionManifest> = [
+export const manifests: Array<any> = [
  {
  type: 'dashboard',
  alias: 'lightning-payments-dashboard',

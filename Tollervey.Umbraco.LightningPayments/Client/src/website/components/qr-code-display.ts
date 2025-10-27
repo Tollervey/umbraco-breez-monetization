@@ -12,7 +12,8 @@ export class BreezQrCodeDisplay extends LitElement {
  async updated(changed: Map<string, unknown>) { if (changed.has('data')) await this._renderQr(); }
 
  private async _renderQr() {
- const canvas = this.renderRoot?.querySelector('canvas') as HTMLCanvasElement | null;
+ const root = (this.shadowRoot as ShadowRoot | null);
+ const canvas = root?.querySelector('canvas') as HTMLCanvasElement | null;
  if (!canvas || !this.data) return;
  await QRCode.toCanvas(canvas, this.data, { width: this.size, margin:1 });
  }
