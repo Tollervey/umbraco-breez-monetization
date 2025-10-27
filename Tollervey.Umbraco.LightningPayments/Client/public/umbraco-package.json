@@ -8,15 +8,7 @@
       "name": "Lightning Payments Bundle",
       "alias": "Tollervey.LightningPayments.Bundle",
       "type": "bundle",
-      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/my-extension.js"
-    }
-  ],
-  "assets": [
-    {
-      "type": "js",
-      "assets": [
-        "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
-      ]
+      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
     }
   ]
 }
