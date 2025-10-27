@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
-    outDir: "../wwwroot/App_Plugins/MyExtension",
+    outDir: "../wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments",
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {

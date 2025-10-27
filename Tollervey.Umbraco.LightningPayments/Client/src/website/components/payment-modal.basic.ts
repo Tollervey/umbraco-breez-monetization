@@ -10,6 +10,10 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String }) title = 'Lightning Payment';
  @property({ type: String }) description = '';
  @property({ type: Number }) contentId?: number;
+ // New: allow passing a pre-created invoice and hash (used by tip-jar)
+ @property({ type: String }) invoice?: string;
+ @property({ type: String }) paymentHash?: string;
+
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
  @state() private _error = '';
@@ -30,6 +34,15 @@ export class BreezPaymentModalBasic extends LitElement {
  this._error = err?.message ?? 'Failed to create invoice';
  } finally {
  this._loading = false;
+ }
+ }
+
+ // When the modal opens, if a pre-created invoice was provided (tip-jar), use it
+ updated(changed: Map<string, unknown>) {
+ if (changed.has('open') || changed.has('invoice') || changed.has('paymentHash')) {
+ if (this.open && this.invoice && this.paymentHash && !this._invoice) {
+ this._invoice = { bolt11: this.invoice, paymentHash: this.paymentHash };
+ }
  }
  }
 
