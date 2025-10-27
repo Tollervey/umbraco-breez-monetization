@@ -54,7 +54,6 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
-    <Folder Include="wwwroot\App_Plugins\MyExtension\" />
   </ItemGroup>
 
   <!-- Restore and build Client files -->
