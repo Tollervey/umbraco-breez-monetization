@@ -10,5 +10,13 @@
       "type": "bundle",
       "js": "/App_Plugins/MyExtension/my-extension.js"
     }
+  ],
+  "assets": [
+    {
+      "type": "js",
+      "assets": [
+        "/App_Plugins/MyExtension/lightning-ui.js"
+      ]
+    }
   ]
 }

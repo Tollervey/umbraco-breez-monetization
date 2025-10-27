@@ -2,16 +2,21 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
-    lib: {
-      entry: "src/bundle.manifests.ts", // Bundle registers one or more manifests
-      formats: ["es"],
-      fileName: "my-extension",
-    },
-    outDir: "../wwwroot/App_Plugins/MyExtension", // your web component will be saved in this location
+    outDir: "../wwwroot/App_Plugins/MyExtension",
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
+      input: {
+        "my-extension": "src/bundle.manifests.ts",
+        "lightning-ui": "src/website/website.entry.ts",
+      },
       external: [/^@umbraco/],
+      output: {
+        entryFileNames: (chunk) => `${chunk.name}.js`,
+        chunkFileNames: (chunk) => `${chunk.name}.js`,
+        assetFileNames: (asset) => `${asset.name}`,
+        format: "es",
+      },
     },
   },
 });
