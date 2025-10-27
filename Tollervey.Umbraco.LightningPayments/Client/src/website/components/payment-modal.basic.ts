@@ -219,18 +219,18 @@ export class BreezPaymentModalBasic extends LitElement {
 
  static styles = css`
  :host { display: block; }
- .overlay { position: fixed; inset:0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:1000; }
- .modal { background:white; color:#222; border-radius:8px; width:min(520px,92vw); max-height:90vh; overflow:auto; box-shadow:010px30px rgba(0,0,0,0.3); outline:none; }
- .header { display:flex; justify-content:space-between; align-items:center; padding:0.75rem1rem; border-bottom:1px solid #eee; }
+ .overlay { position: fixed; inset:0; background: var(--lp-overlay); display:flex; align-items:center; justify-content:center; z-index:1000; }
+ .modal { background: var(--lp-color-surface); color: var(--lp-color-text); border-radius: var(--lp-radius); width:min(520px,92vw); max-height:90vh; overflow:auto; box-shadow: var(--lp-shadow); outline:none; }
+ .header { display:flex; justify-content:space-between; align-items:center; padding:0.75rem1rem; border-bottom: var(--lp-border); }
  .header h3 { margin:0; font-size:1.1rem; }
- .close { border:0; background:none; font-size:1.4rem; cursor:pointer; }
+ .close { border:0; background:none; font-size:1.4rem; cursor:pointer; color: var(--lp-color-text); }
  .body { padding:1rem; display:flex; flex-direction:column; gap:0.75rem; }
- .primary { background:#f89c1c; border:0; color:white; padding:0.7rem1rem; border-radius:6px; cursor:pointer; }
- .primary:hover { background:#e68a0a; }
+ .primary { background: var(--lp-color-primary); border:0; color: var(--lp-color-bg); padding:0.7rem1rem; border-radius: var(--lp-radius); cursor:pointer; }
+ .primary:hover { background: var(--lp-color-primary-hover); }
  .primary[aria-busy="true"] { opacity:0.8; cursor:wait; }
- .error { color:#b00020; padding:0.5rem0; }
- .desc { color:#666; }
- .expiry { color:#666; font-size:0.9rem; }
+ .error { color: var(--lp-color-danger); padding:0.5rem0; }
+ .desc { color: var(--lp-color-text-muted); }
+ .expiry { color: var(--lp-color-text-muted); font-size:0.9rem; }
  `;
 }
 
