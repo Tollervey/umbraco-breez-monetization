@@ -7,30 +7,25 @@ export class BreezQrCodeDisplay extends LitElement {
  @property({ type: String }) data: string = '';
  @property({ type: Number }) size: number =240;
 
- async updated(changed: Map<string, unknown>) {
- if (changed.has('data')) {
- await this._renderQr();
- }
- }
+ render() { return html`<canvas width="${this.size}" height="${this.size}"></canvas>`; }
+
+ async updated(changed: Map<string, unknown>) { if (changed.has('data')) await this._renderQr(); }
 
  private async _renderQr() {
- const canvas = this.renderRoot?.querySelector('canvas');
+ const canvas = this.renderRoot?.querySelector('canvas') as HTMLCanvasElement | null;
  if (!canvas || !this.data) return;
- await QRCode.toCanvas(canvas as HTMLCanvasElement, this.data, { width: this.size, margin:1 });
- }
-
- render() {
- return html`<canvas width="${this.size}" height="${this.size}"></canvas>`;
+ await QRCode.toCanvas(canvas, this.data, { width: this.size, margin:1 });
  }
 
  static styles = css`
  :host { display: inline-block; }
- canvas { background: white; border:1px solid #eee; border-radius:6px; }
+ canvas {
+ background: var(--lp-color-surface);
+ border: var(--lp-border);
+ border-radius: var(--lp-radius);
+ box-shadow: var(--lp-shadow);
+ }
  `;
 }
 
-declare global {
- interface HTMLElementTagNameMap {
- 'breez-qr-code-display': BreezQrCodeDisplay;
- }
-}
+declare global { interface HTMLElementTagNameMap { 'breez-qr-code-display': BreezQrCodeDisplay; } }

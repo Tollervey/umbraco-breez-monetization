@@ -33,11 +33,11 @@ export class BreezInvoiceDisplay extends LitElement {
 
  static styles = css`
  :host { display: block; }
- .inv { display:flex; flex-direction: column; gap:0.5rem; }
- textarea { width:100%; height:120px; border:1px solid #ddd; border-radius:6px; padding:0.5rem; font-family: monospace; }
+ .inv { display:flex; flex-direction: column; gap: var(--lp-spacing); }
+ textarea { width:100%; height:120px; border: var(--lp-border); border-radius: var(--lp-radius); padding:0.5rem; font-family: monospace; background: var(--lp-color-surface); color: var(--lp-color-text); }
  .row { display:flex; gap:0.5rem; align-items: center; }
- .secondary { background:#f1f1f1; border:1px solid #ddd; border-radius:6px; padding:0.4rem0.7rem; cursor:pointer; }
- .primary { text-decoration:none; background:#f89c1c; color:white; padding:0.45rem0.75rem; border-radius:6px; }
+ .secondary { background: transparent; border: var(--lp-border); border-radius: var(--lp-radius); padding:0.4rem0.7rem; cursor:pointer; color: var(--lp-color-text); }
+ .primary { text-decoration:none; background: var(--lp-color-primary); color:white; padding:0.45rem0.75rem; border-radius: var(--lp-radius); }
  `;
 }
 
