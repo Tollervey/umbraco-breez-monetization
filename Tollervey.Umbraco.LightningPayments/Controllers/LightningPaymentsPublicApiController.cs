@@ -214,7 +214,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  }
 
  /// <summary>
- /// Create a tip-jar invoice (anonymous). Not tied to content or session state by default.
+ /// Create a tip-jar invoice (anonymous). Records a pending TIP payment with amount for stats.
  /// </summary>
  [HttpPost("CreateTipInvoice")]
  public async Task<IActionResult> CreateTipInvoice([FromBody] TipInvoiceRequest request)
@@ -237,6 +237,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  return BadRequest("Failed to obtain invoice payment hash.");
  }
 
+ // Record a pending TIP with amount for stats. Use session0/empty since tips are not tied to access.
+ var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
+ Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
+ await _paymentStateService.AddPendingPaymentAsync(paymentHash!, request.ContentId ??0, sessionId);
+ await _paymentStateService.SetPaymentMetadataAsync(paymentHash!, request.AmountSat, PaymentKind.Tip);
+
  return Ok(new { invoice, paymentHash });
  }
  catch (Exception ex)
@@ -247,42 +253,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  }
 
  /// <summary>
- /// Optional: Return a receive fee quote for the content's configured amount.
- /// </summary>
- [HttpGet("GetPaywallReceiveFeeQuote")]
- public async Task<IActionResult> GetPaywallReceiveFeeQuote([FromQuery] int contentId, [FromQuery] bool bolt12 = false)
- {
- if (contentId <=0)
- {
- return BadRequest("Invalid content ID.");
- }
-
- try
- {
- var (_, paywallConfig) = GetContentAndPaywallConfig(contentId);
- if (paywallConfig == null || !paywallConfig.Enabled || paywallConfig.Fee ==0)
- {
- return BadRequest("Paywall is not enabled or fee is not set.");
- }
-
- var feesSat = await _breezSdkService.GetReceiveFeeQuoteAsync(paywallConfig.Fee, bolt12);
- return Ok(new { amountSat = paywallConfig.Fee, feesSat, method = bolt12 ? "bolt12" : "bolt11" });
- }
- catch (InvalidInvoiceRequestException ex)
- {
- _logger.LogWarning(ex, "Invalid request for fee quote.");
- return BadRequest(ex.Message);
- }
- catch (Exception ex)
- {
- _logger.LogError(ex, "Error fetching receive fee quote for contentId {ContentId}", contentId);
- return StatusCode(500, "An error occurred while fetching the fee quote.");
- }
- }
-
- /// <summary>
- /// Read-only tip stats. If contentId is provided, return stats scoped to that content.
- /// Otherwise return global totals. For now, use PaymentState store as simple source.
+ /// Read-only tip stats.
  /// </summary>
  [HttpGet("GetTipStats")]
  public async Task<IActionResult> GetTipStats([FromQuery] int? contentId = null)
@@ -290,15 +261,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  try
  {
  var all = await _paymentStateService.GetAllPaymentsAsync();
- var paid = all.Where(p => p.Status.ToString().Equals("Paid", StringComparison.OrdinalIgnoreCase));
- if (contentId.HasValue && contentId.Value >0)
- {
- paid = paid.Where(p => p.ContentId == contentId.Value);
- }
+ var paid = all.Where(p => p.Status == PaymentStatus.Paid && p.Kind == PaymentKind.Tip);
+ if (contentId.HasValue && contentId.Value >0) { paid = paid.Where(p => p.ContentId == contentId.Value); }
  var count = paid.Count();
- // We don't store amounts in PaymentState; return count only for now.
- // If amount tracking is added later, totalSats can be computed accordingly.
- return Ok(new { count, totalSats =0 });
+ var total = paid.Aggregate<PaymentState, ulong>(0, (acc, p) => acc + p.AmountSat);
+ return Ok(new { count, totalSats = total });
  }
  catch (Exception ex)
  {

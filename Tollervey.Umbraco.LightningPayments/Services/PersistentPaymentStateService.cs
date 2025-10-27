@@ -36,7 +36,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                         PaymentHash = paymentHash,
                         ContentId = contentId,
                         UserSessionId = userSessionId,
-                        Status = PaymentStatus.Pending
+                        Status = PaymentStatus.Pending,
+                        AmountSat = 0UL,
+                        Kind = PaymentKind.Paywall
                     };
 
                     _context.PaymentStates.Add(state);
@@ -53,6 +55,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             catch (Exception ex)
             {
                 throw new PaymentException("Failed to add pending payment.", ex);
+            }
+        }
+
+        // helper to set amount/kind when known (e.g., tips)
+        public async Task SetPaymentMetadataAsync(string paymentHash, ulong amountSat, PaymentKind kind)
+        {
+            var state = await _context.PaymentStates.FirstOrDefaultAsync(p => p.PaymentHash == paymentHash);
+            if (state != null)
+            {
+                state.AmountSat = amountSat;
+                state.Kind = kind;
+                await _context.SaveChangesAsync();
             }
         }
 

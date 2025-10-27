@@ -62,6 +62,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// <param name="paymentHash">The unique hash of the payment.</param>
         /// <returns>True if updated, false otherwise.</returns>
         Task<bool> MarkAsRefundedAsync(string paymentHash);
+
+        /// <summary>
+        /// Sets the metadata for a payment, such as amount and kind.
+        /// </summary>
+        /// <param name="paymentHash">The unique hash of the payment.</param>
+        /// <param name="amountSat">The amount in satoshis.</param>
+        /// <param name="kind">The kind of payment.</param>
+        Task SetPaymentMetadataAsync(string paymentHash, ulong amountSat, PaymentKind kind);
     }
 
     public enum PaymentConfirmationResult

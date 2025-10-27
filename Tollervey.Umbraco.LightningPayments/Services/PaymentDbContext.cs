@@ -13,6 +13,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         {
             modelBuilder.Entity<PaymentState>()
                 .HasKey(p => p.PaymentHash);
+            modelBuilder.Entity<PaymentState>()
+                .Property(p => p.AmountSat)
+                .HasDefaultValue(0UL);
+            modelBuilder.Entity<PaymentState>()
+                .Property(p => p.Kind)
+                .HasDefaultValue(PaymentKind.Paywall);
         }
     }
 }

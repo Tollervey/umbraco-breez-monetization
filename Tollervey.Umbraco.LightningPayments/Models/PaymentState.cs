@@ -6,6 +6,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
     public enum PaymentStatus { Pending, Paid, Failed, Expired, RefundPending, Refunded }
 
     /// <summary>
+    /// Classifies the kind of payment.
+    /// </summary>
+    public enum PaymentKind { Paywall, Tip }
+
+    /// <summary>
     /// Represents the state of a payment for content access.
     /// </summary>
     public class PaymentState
@@ -16,7 +21,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
         public string PaymentHash { get; set; } = string.Empty;
 
         /// <summary>
-        /// The ID of the content item.
+        /// The ID of the content item. Optional for tips;0 when not associated.
         /// </summary>
         public int ContentId { get; set; }
 
@@ -29,5 +34,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Models
         /// The current status of the payment.
         /// </summary>
         public PaymentStatus Status { get; set; }
+
+        /// <summary>
+        /// The amount of the payment in satoshis.
+        /// </summary>
+        public ulong AmountSat { get; set; }
+
+        /// <summary>
+        /// The kind of the payment (Paywall or Tip).
+        /// </summary>
+        public PaymentKind Kind { get; set; }
     }
 }
