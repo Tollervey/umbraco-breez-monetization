@@ -6,6 +6,7 @@ import './payment-modal.basic.js';
  * <breez-tip-jar>
  * - Lets a user select an amount and creates a tip invoice via the public API.
  * - Reuses the payment modal to present the QR/invoice.
+ * - Shows basic stats fetched from a read-only endpoint.
  */
 @customElement('breez-tip-jar')
 export class BreezTipJarElement extends LitElement {
@@ -22,9 +23,29 @@ export class BreezTipJarElement extends LitElement {
  @state() private _bolt11?: string;
  @state() private _paymentHash?: string;
 
+ // basic stats
+ @state() private _totalSats: number | null = null;
+ @state() private _count: number | null = null;
+ @state() private _statsError = '';
+
  connectedCallback(): void {
  super.connectedCallback();
  this._selected = this.defaultAmount || this.amounts[0] ||1000;
+ this.loadStats();
+ }
+
+ private async loadStats() {
+ // Read-only endpoint expected: /api/public/lightning/GetTipStats?contentId=
+ const url = this.contentId ? `/api/public/lightning/GetTipStats?contentId=${this.contentId}` : `/api/public/lightning/GetTipStats`;
+ try {
+ const res = await fetch(url);
+ if (!res.ok) return; // optional
+ const data = await res.json();
+ this._totalSats = typeof data.totalSats === 'number' ? data.totalSats : null;
+ this._count = typeof data.count === 'number' ? data.count : null;
+ } catch (e: any) {
+ this._statsError = e?.message ?? 'Failed to load stats';
+ }
  }
 
  private async _createTip() {
@@ -62,6 +83,8 @@ export class BreezTipJarElement extends LitElement {
  <span>sats</span>
  </label>
  </div>
+ ${this._statsError ? html`<div class="stats error">${this._statsError}</div>` : ''}
+ ${this._totalSats != null && this._count != null ? html`<div class="stats">${this._count} tips, ${this._totalSats.toLocaleString()} sats total</div>` : ''}
  ${this._error ? html`<div class="error">${this._error}</div>` : ''}
  <button class="primary" @click=${this._createTip} ?disabled=${this._loading}>${this._loading ? 'Please wait…' : 'Tip'}</button>
  </div>
@@ -88,6 +111,7 @@ export class BreezTipJarElement extends LitElement {
  .primary { background:#f89c1c; border:0; color: white; padding:0.6rem1rem; border-radius:6px; cursor:pointer; align-self: start; }
  .primary:hover { background:#e68a0a; }
  .error { color:#b00020; }
+ .stats { color:#666; font-size:0.9rem; }
  `;
 }
 

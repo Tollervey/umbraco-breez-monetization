@@ -280,6 +280,33 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  }
  }
 
+ /// <summary>
+ /// Read-only tip stats. If contentId is provided, return stats scoped to that content.
+ /// Otherwise return global totals. For now, use PaymentState store as simple source.
+ /// </summary>
+ [HttpGet("GetTipStats")]
+ public async Task<IActionResult> GetTipStats([FromQuery] int? contentId = null)
+ {
+ try
+ {
+ var all = await _paymentStateService.GetAllPaymentsAsync();
+ var paid = all.Where(p => p.Status.ToString().Equals("Paid", StringComparison.OrdinalIgnoreCase));
+ if (contentId.HasValue && contentId.Value >0)
+ {
+ paid = paid.Where(p => p.ContentId == contentId.Value);
+ }
+ var count = paid.Count();
+ // We don't store amounts in PaymentState; return count only for now.
+ // If amount tracking is added later, totalSats can be computed accordingly.
+ return Ok(new { count, totalSats =0 });
+ }
+ catch (Exception ex)
+ {
+ _logger.LogError(ex, "Error getting tip stats for ContentId {ContentId}", contentId);
+ return StatusCode(500, "An error occurred while fetching tip stats.");
+ }
+ }
+ 
  private (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId)
  {
  using var cref = _umbracoContextFactory.EnsureUmbracoContext();
