@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -28,12 +29,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  private readonly IBreezSdkService _breezSdkService;
  private readonly IUmbracoContextFactory _umbracoContextFactory;
  private readonly ILightningPaymentsRuntimeMode _runtimeMode;
+ private readonly LightningPaymentsSettings _settings;
 
- public InvoiceHelper(IBreezSdkService breezSdkService, IUmbracoContextFactory umbracoContextFactory, ILightningPaymentsRuntimeMode runtimeMode)
+ public InvoiceHelper(IBreezSdkService breezSdkService, IUmbracoContextFactory umbracoContextFactory, ILightningPaymentsRuntimeMode runtimeMode, IOptions<LightningPaymentsSettings> settings)
  {
  _breezSdkService = breezSdkService;
  _umbracoContextFactory = umbracoContextFactory;
  _runtimeMode = runtimeMode;
+ _settings = settings.Value;
  }
 
  public (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId)
@@ -74,7 +77,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  var sessionId = !string.IsNullOrWhiteSpace(explicitState)
  ? explicitState!
  : (request.Cookies[Middleware.PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString());
- response.Cookies.Append(Middleware.PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
+ var options = new CookieOptions { HttpOnly = true, Secure = true, SameSite = _settings.SessionCookieSameSite };
+ if (!string.IsNullOrWhiteSpace(_settings.SessionCookieDomain)) options.Domain = _settings.SessionCookieDomain;
+ response.Cookies.Append(Middleware.PaywallMiddleware.PaywallCookieName, sessionId, options);
  return sessionId;
  }
 

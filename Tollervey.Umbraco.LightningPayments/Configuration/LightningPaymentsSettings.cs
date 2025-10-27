@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
 {
@@ -110,6 +111,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// </summary>
         [Range(1, 1024)]
         public int MaxInvoiceDescriptionLength { get; init; } = 200;
+
+        /// <summary>
+        /// Session cookie SameSite mode. Defaults to Strict to prevent cross-site sends.
+        /// Use Lax only if you need cross-subdomain flows and accept the trade-offs.
+        /// </summary>
+        public SameSiteMode SessionCookieSameSite { get; init; } = SameSiteMode.Strict;
+
+        /// <summary>
+        /// Optional cookie domain for subdomain scoping (e.g. .example.com).
+        /// Leave null/empty to use host-only cookie.
+        /// </summary>
+        public string? SessionCookieDomain { get; init; }
     }
 
 }

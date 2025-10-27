@@ -245,8 +245,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 _logger.LogInformation("Invoice requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
                 var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
-                var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
-                Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
+                var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
                 await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
                 return Ok(new { invoice, paymentHash });
             }
@@ -318,8 +317,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 if (sats != paywallConfig.Fee) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Amount does not match the required fee.");
                 var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(sats, $"Access to {content.Name} (ID: {contentId})");
-                var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
-                Response.Cookies.Append(PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
+                var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
                 await _paymentStateService.AddPendingPaymentAsync(paymentHash, contentId, sessionId);
                 return Ok(new { pr = invoice });
             }
