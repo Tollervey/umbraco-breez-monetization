@@ -17,7 +17,7 @@ export const lightningTheme = css`
  --lp-overlay: rgba(0,0,0,0.6);
  --lp-radius:6px;
  --lp-border:1px solid var(--lp-color-border);
- --lp-shadow:010px30px rgba(0,0,0,0.15);
+ --lp-shadow: 0 10px 30px rgba(0,0,0,0.15);
  --lp-spacing:0.75rem;
  }
 
@@ -29,7 +29,7 @@ export const lightningTheme = css`
  --lp-color-text-muted: #a6a6a6;
  --lp-color-border: #2b2b2e;
  --lp-overlay: rgba(0,0,0,0.7);
- --lp-shadow:010px30px rgba(0,0,0,0.5);
+ --lp-shadow: 0 10px 30px rgba(0,0,0,0.5);
  }
  }
 
@@ -40,6 +40,6 @@ export const lightningTheme = css`
  --lp-color-text-muted: #a6a6a6;
  --lp-color-border: #2b2b2e;
  --lp-overlay: rgba(0,0,0,0.7);
- --lp-shadow:010px30px rgba(0,0,0,0.5);
+ --lp-shadow: 0 10px 30px rgba(0,0,0,0.5);
  }
 `;

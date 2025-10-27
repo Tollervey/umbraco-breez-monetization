@@ -368,12 +368,12 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     css`
       :host { display:block; padding: var(--uui-size-layout-1); }
       uui-box { margin-bottom: var(--uui-size-layout-1); }
-      h2 { margin-top: 0; }
+      h2 { margin-top:0; }
       .toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; }
       .auto { display:flex; gap:0.35rem; align-items:center; color: var(--uui-color-text); }
-      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem1rem; }
+      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem 1rem; }
       .fees-details { margin-top:0.5rem; }
-      .quote-row { display:grid; grid-template-columns:1fr1fr auto; gap:0.5rem; align-items:end; }
+      .quote-row { display:grid; grid-template-columns: 1fr 1fr auto; gap:0.5rem; align-items:end; }
       .quote-out { margin-top:0.5rem; }
       .test-grid {
         display: grid;

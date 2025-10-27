@@ -88,15 +88,15 @@ export class BreezPaymentModalBasic extends LitElement {
 
  static styles = css`
  :host { display: block; }
- .overlay { position: fixed; inset:0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:1000; }
- .modal { background: white; color: #222; border-radius:8px; width: min(520px,92vw); max-height:90vh; overflow:auto; box-shadow:010px30px rgba(0,0,0,0.3); }
- .header { display:flex; justify-content: space-between; align-items:center; padding:0.75rem1rem; border-bottom:1px solid #eee; }
- .header h3 { margin:0; font-size:1.1rem; }
- .close { border:0; background: none; font-size:1.4rem; cursor: pointer; }
- .body { padding:1rem; display:flex; flex-direction: column; gap:0.75rem; }
- .primary { background: #f89c1c; border:0; color: white; padding:0.7rem1rem; border-radius:6px; cursor: pointer; }
+ .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+ .modal { background: white; color: #222; border-radius: 8px; width: min(520px, 92vw); max-height: 90vh; overflow: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+ .header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; border-bottom: 1px solid #eee; }
+ .header h3 { margin: 0; font-size: 1.1rem; }
+ .close { border: 0; background: none; font-size: 1.4rem; cursor: pointer; }
+ .body { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+ .primary { background: #f89c1c; border: 0; color: white; padding: 0.7rem 1rem; border-radius: 6px; cursor: pointer; }
  .primary:hover { background: #e68a0a; }
- .error { color: #b00020; padding:0.5rem0; }
+ .error { color: #b00020; padding: 0.5rem 0; }
  .desc { color: #666; }
  `;
 }

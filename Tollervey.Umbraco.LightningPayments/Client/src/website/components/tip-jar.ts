@@ -104,11 +104,11 @@ export class BreezTipJarElement extends LitElement {
  :host { display: block; }
  .tip-jar { display:flex; flex-direction: column; gap:0.75rem; }
  .row { display:flex; flex-wrap: wrap; gap:0.5rem; align-items: center; }
- .amount-btn { background:#f1f1f1; border:1px solid #ddd; border-radius:6px; padding:0.4rem0.7rem; cursor:pointer; }
+ .amount-btn { background:#f1f1f1; border:1px solid #ddd; border-radius:6px; padding:0.4rem 0.7rem; cursor:pointer; }
  .amount-btn[data-selected="true"], .amount-btn[data-selected] { background:#f89c1c; color: white; border-color:#e68a0a; }
  .custom-input { display:flex; align-items: center; gap:0.3rem; }
  .custom-input input { width:120px; padding:0.4rem; border:1px solid #ddd; border-radius:6px; }
- .primary { background:#f89c1c; border:0; color: white; padding:0.6rem1rem; border-radius:6px; cursor:pointer; align-self: start; }
+ .primary { background:#f89c1c; border:0; color: white; padding:0.6rem 1rem; border-radius:6px; cursor:pointer; align-self: start; }
  .primary:hover { background:#e68a0a; }
  .error { color:#b00020; }
  .stats { color:#666; font-size:0.9rem; }
