@@ -49,6 +49,7 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddSingleton<BreezEventProcessor>();
             builder.Services.AddSingleton<IBreezEventProcessor>(sp => sp.GetRequiredService<BreezEventProcessor>());
             builder.Services.AddHostedService(sp => sp.GetRequiredService<BreezEventProcessor>());
+            builder.Services.AddHostedService<PaymentDbInitializer>();
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>();
 
