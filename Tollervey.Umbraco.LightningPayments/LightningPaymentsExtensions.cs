@@ -6,6 +6,7 @@ using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
+using Tollervey.Umbraco.LightningPayments.UI.Services.Realtime;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -52,6 +53,9 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddHostedService<PaymentDbInitializer>();
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>();
+
+            // Realtime hub (SSE)
+            builder.Services.AddSingleton<SseHub>();
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 

@@ -4,6 +4,7 @@ using Breez.Sdk.Liquid;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tollervey.Umbraco.LightningPayments.UI.Services.Realtime;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
@@ -62,6 +63,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                     using var scope = _scopeFactory.CreateScope();
                     var deduper = scope.ServiceProvider.GetRequiredService<IPaymentEventDeduper>();
                     var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentStateService>();
+                    var sseHub = scope.ServiceProvider.GetRequiredService<SseHub>();
 
                     string? paymentHash = null;
                     try
@@ -109,13 +111,21 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
                     await paymentService.ConfirmPaymentAsync(paymentHash);
                     _logger.LogInformation("Confirmed payment in real-time for hash: {PaymentHash}", paymentHash);
+
+                    // Lookup the session to notify and broadcast SSE to the correct browser session
+                    var state = await paymentService.GetByPaymentHashAsync(paymentHash);
+                    if (state != null && !string.IsNullOrWhiteSpace(state.UserSessionId))
+                    {
+                        sseHub.Broadcast(state.UserSessionId, "payment-succeeded", new { paymentHash = state.PaymentHash, contentId = state.ContentId, kind = state.Kind.ToString(), status = state.Status.ToString(), amountSat = state.AmountSat });
+                    }
+
                     deduper.Complete(paymentHash);
                     activity?.SetStatus(ActivityStatusCode.Ok);
                 }
                 catch (Exception ex)
                 {
                     activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-                    _logger.LogError(ex, "Failed to confirm payment from SDK event.");
+                    _logger.LogError(ex, "Failed to confirm/broadcast payment from SDK event.");
                 }
             }
         }

@@ -204,5 +204,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 throw new PaymentException("Failed to mark payment as refunded.", ex);
             }
         }
+
+        /// <inheritdoc />
+        public async Task<PaymentState?> GetByPaymentHashAsync(string paymentHash)
+        {
+            try
+            {
+                return await _context.PaymentStates.FirstOrDefaultAsync(p => p.PaymentHash == paymentHash);
+            }
+            catch (Exception ex)
+            {
+                throw new PaymentException("Failed to get payment by hash.", ex);
+            }
+        }
     }
 }

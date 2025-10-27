@@ -70,6 +70,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// <param name="amountSat">The amount in satoshis.</param>
         /// <param name="kind">The kind of payment.</param>
         Task SetPaymentMetadataAsync(string paymentHash, ulong amountSat, PaymentKind kind);
+
+        /// <summary>
+        /// Gets a payment state by its payment hash.
+        /// </summary>
+        Task<PaymentState?> GetByPaymentHashAsync(string paymentHash);
     }
 
     public enum PaymentConfirmationResult

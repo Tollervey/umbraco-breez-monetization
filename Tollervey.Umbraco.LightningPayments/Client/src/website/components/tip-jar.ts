@@ -28,14 +28,43 @@ export class BreezTipJarElement extends LitElement {
  @state() private _count: number | null = null;
  @state() private _statsError = '';
 
+ // realtime
+ private _evtSrc?: EventSource;
+ @state() private _thanks = false;
+
  connectedCallback(): void {
  super.connectedCallback();
  this._selected = this.defaultAmount || this.amounts[0] ||1000;
  this.loadStats();
+ this._connectRealtime();
+ }
+
+ disconnectedCallback(): void {
+ super.disconnectedCallback();
+ if (this._evtSrc) { this._evtSrc.close(); this._evtSrc = undefined; }
+ }
+
+ private _connectRealtime() {
+ try {
+ this._evtSrc?.close();
+ this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
+ this._evtSrc.addEventListener('payment-succeeded', (ev: MessageEvent) => {
+ try {
+ const data = JSON.parse(ev.data);
+ // If this event references the same hash we created here, show thanks.
+ if (data?.paymentHash && data.paymentHash === this._paymentHash) {
+ this._thanks = true;
+ this._modalOpen = false;
+ // Optionally refresh stats
+ this.loadStats();
+ }
+ } catch { /* ignore */ }
+ });
+ this._evtSrc.onerror = () => { /* keep connection alive; browser will retry */ };
+ } catch (e) { /* ignore */ }
  }
 
  private async loadStats() {
- // Read-only endpoint expected: /api/public/lightning/GetTipStats?contentId=
  const url = this.contentId ? `/api/public/lightning/GetTipStats?contentId=${this.contentId}` : `/api/public/lightning/GetTipStats`;
  try {
  const res = await fetch(url);
@@ -53,6 +82,7 @@ export class BreezTipJarElement extends LitElement {
  this._error = '';
  this._bolt11 = undefined;
  this._paymentHash = undefined;
+ this._thanks = false;
  try {
  const res = await fetch('/api/public/lightning/CreateTipInvoice', {
  method: 'POST',
@@ -85,6 +115,7 @@ export class BreezTipJarElement extends LitElement {
  </div>
  ${this._statsError ? html`<div class="stats error">${this._statsError}</div>` : ''}
  ${this._totalSats != null && this._count != null ? html`<div class="stats">${this._count} tips, ${this._totalSats.toLocaleString()} sats total</div>` : ''}
+ ${this._thanks ? html`<div class="thanks">Thanks for your tip! ??</div>` : ''}
  ${this._error ? html`<div class="error">${this._error}</div>` : ''}
  <button class="primary" @click=${this._createTip} ?disabled=${this._loading}>${this._loading ? 'Please wait…' : 'Tip'}</button>
  </div>
@@ -102,16 +133,17 @@ export class BreezTipJarElement extends LitElement {
 
  static styles = css`
  :host { display: block; }
- .tip-jar { display:flex; flex-direction: column; gap:0.75rem; }
- .row { display:flex; flex-wrap: wrap; gap:0.5rem; align-items: center; }
- .amount-btn { background:#f1f1f1; border:1px solid #ddd; border-radius:6px; padding:0.4rem 0.7rem; cursor:pointer; }
- .amount-btn[data-selected="true"], .amount-btn[data-selected] { background:#f89c1c; color: white; border-color:#e68a0a; }
- .custom-input { display:flex; align-items: center; gap:0.3rem; }
+ .tip-jar { display: flex; flex-direction: column; gap:0.75rem; }
+ .row { display: flex; flex-wrap: wrap; gap:0.5rem; align-items: center; }
+ .amount-btn { background: #f1f1f1; border:1px solid #ddd; border-radius:6px; padding:0.4rem0.7rem; cursor: pointer; }
+ .amount-btn[data-selected="true"], .amount-btn[data-selected] { background: #f89c1c; color: white; border-color: #e68a0a; }
+ .custom-input { display: flex; align-items: center; gap:0.3rem; }
  .custom-input input { width:120px; padding:0.4rem; border:1px solid #ddd; border-radius:6px; }
- .primary { background:#f89c1c; border:0; color: white; padding:0.6rem 1rem; border-radius:6px; cursor:pointer; align-self: start; }
- .primary:hover { background:#e68a0a; }
- .error { color:#b00020; }
- .stats { color:#666; font-size:0.9rem; }
+ .primary { background: #f89c1c; border:0; color: white; padding:0.6rem1rem; border-radius:6px; cursor: pointer; align-self: start; }
+ .primary:hover { background: #e68a0a; }
+ .error { color: #b00020; }
+ .thanks { color: var(--lp-color-success, #2e7d32); font-weight:600; }
+ .stats { color: #666; font-size:0.9rem; }
  `;
 }
 
