@@ -21,7 +21,7 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   @state() private filteredPayments: Payment[] = [];
   @state() private searchTerm: string = "";
 
-  // New: status/limits/fees
+  // status/limits/fees
   @state() private connected = false;
   @state() private offlineMode = false;
   @state() private minSat: number | null = null;
@@ -30,8 +30,17 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   @state() private loadingStatus = true;
   @state() private errorStatus = "";
 
-  // New: test invoice
-  @state() private testAmount = 1000;
+  // health check
+  @state() private health: { status: string; description?: string } | null = null;
+
+  // quote
+  @state() private quoteAmount =1000;
+  @state() private quoting = false;
+  @state() private quoteError = "";
+  @state() private quoteResult: { amountSat: number; feesSat: number; method: "string" } | null = null;
+
+  // test invoice
+  @state() private testAmount =1000;
   @state() private testDescription = "Test invoice";
   @state() private creatingInvoice = false;
   @state() private createdInvoice: string | null = null;
@@ -39,16 +48,16 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
   @state() private invoiceQrDataUrl: string | null = null;
   @state() private invoiceError = "";
 
-  // New: refresh tools
+  // refresh tools
   @state() private autoRefresh = false;
   private refreshTimer: number | null = null;
-  private readonly refreshIntervalMs = 10000;
+  private readonly refreshIntervalMs =10000;
   @state() private refreshing = false;
 
-  // New: copy feedback
+  // copy feedback
   @state() private copyOk = false;
 
-  // New: action feedback
+  // row actions
   @state() private rowActionBusy: Record<string, boolean> = {};
   @state() private rowActionError: Record<string, string> = {};
 
@@ -59,10 +68,8 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
 
   connectedCallback(): void {
     super.connectedCallback();
-    // Autostart refresh if already enabled (persisting state is out of scope)
     if (this.autoRefresh) this.startAutoRefresh();
   }
-
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.stopAutoRefresh();
@@ -73,6 +80,7 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
       this.loadStatus(),
       this.loadLimits(),
       this.loadRecommendedFees(),
+      this.loadHealth(),
       this.loadPayments(),
     ]);
   }
@@ -100,13 +108,11 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
       const res = await fetch(
         "/umbraco/management/api/lightningpayments/GetLightningReceiveLimits"
       );
-      if (!res.ok) return; // connected might be false
+      if (!res.ok) return;
       const data = await res.json();
       this.minSat = typeof data.minSat === "number" ? data.minSat : null;
       this.maxSat = typeof data.maxSat === "number" ? data.maxSat : null;
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   private async loadRecommendedFees() {
@@ -116,8 +122,18 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
       );
       if (!res.ok) return;
       this.recommendedFees = await res.json();
-    } catch {
-      // ignore
+    } catch {}
+  }
+
+  private async loadHealth() {
+    try {
+      const res = await fetch("/health/ready");
+      if (!res.ok) { this.health = { status: `HTTP ${res.status}` }; return; }
+      const txt = await res.text();
+      // Minimal surface: treat any OK body as healthy.
+      this.health = { status: "Healthy", description: txt?.substring(0,120) };
+    } catch (e: any) {
+      this.health = { status: "Unknown", description: e?.message };
     }
   }
 
@@ -139,10 +155,7 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     const target = e.target as HTMLInputElement;
     this.searchTerm = target.value.toLowerCase();
     this.filteredPayments = this.payments.filter(
-      (p) =>
-        p.paymentHash.toLowerCase().includes(this.searchTerm) ||
-        p.contentId.toString().includes(this.searchTerm) ||
-        p.status.toLowerCase().includes(this.searchTerm)
+      (p) => p.paymentHash.toLowerCase().includes(this.searchTerm) || p.contentId.toString().includes(this.searchTerm) || p.status.toLowerCase().includes(this.searchTerm)
     );
   }
 
@@ -155,28 +168,14 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     try {
       const res = await fetch(
         "/umbraco/management/api/lightningpayments/CreateTestInvoice",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amountSat: this.testAmount,
-            description: this.testDescription,
-          }),
-        }
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountSat: this.testAmount, description: this.testDescription }) }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       this.createdInvoice = data.invoice;
       this.createdPaymentHash = data.paymentHash;
       if (this.createdInvoice) {
-        try {
-          this.invoiceQrDataUrl = await QRCode.toDataURL(this.createdInvoice, {
-            width: 240,
-            margin: 1,
-          });
-        } catch (qrErr) {
-          console.error("QR generation failed", qrErr);
-        }
+        try { this.invoiceQrDataUrl = await QRCode.toDataURL(this.createdInvoice, { width:240, margin:1 }); } catch (qrErr) { console.error("QR generation failed", qrErr); }
       }
     } catch (err: any) {
       this.invoiceError = err?.message ?? "Failed to create invoice";
@@ -185,82 +184,41 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     }
   }
 
-  private onRefreshClick = async () => {
-    this.refreshing = true;
+  private async getQuote() {
+    this.quoting = true;
+    this.quoteError = "";
+    this.quoteResult = null;
     try {
-      await this.loadAll();
-    } finally {
-      this.refreshing = false;
-    }
-  };
-
-  private toggleAutoRefresh = (e: Event) => {
-    const checked = (e.target as HTMLInputElement).checked;
-    this.autoRefresh = checked;
-    if (checked) this.startAutoRefresh();
-    else this.stopAutoRefresh();
-  };
-
-  private startAutoRefresh() {
-    this.stopAutoRefresh();
-    this.refreshTimer = window.setInterval(() => this.loadAll(), this.refreshIntervalMs);
-  }
-
-  private stopAutoRefresh() {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-  }
-
-  private async copyInvoice() {
-    if (!this.createdInvoice) return;
-    try {
-      await navigator.clipboard.writeText(this.createdInvoice);
-      this.copyOk = true;
-      setTimeout(() => (this.copyOk = false), 1500);
-    } catch (err) {
-      console.warn("Copy failed", err);
-    }
-  }
-
-  private async sendRowAction(endpoint: string, paymentHash: string) {
-    this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: true };
-    this.rowActionError = { ...this.rowActionError, [paymentHash]: "" };
-    try {
-      const res = await fetch(
-        `/umbraco/management/api/lightningpayments/${endpoint}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentHash }),
-        }
-      );
+      const url = new URL("/umbraco/management/api/lightningpayments/GetPaywallReceiveFeeQuote", location.origin);
+      url.searchParams.set("contentId", String(0)); // contentId not used for generic quote; server will validate
+      const res = await fetch(url.toString());
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      await this.loadPayments();
+      this.quoteResult = await res.json();
     } catch (err: any) {
-      this.rowActionError = {
-        ...this.rowActionError,
-        [paymentHash]: err?.message ?? "Action failed",
-      };
+      this.quoteError = err?.message ?? "Failed to get quote";
     } finally {
-      this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: false };
+      this.quoting = false;
     }
   }
+
+  private onRefreshClick = async () => { this.refreshing = true; try { await this.loadAll(); } finally { this.refreshing = false; } };
+  private toggleAutoRefresh = (e: Event) => { const checked = (e.target as HTMLInputElement).checked; this.autoRefresh = checked; if (checked) this.startAutoRefresh(); else this.stopAutoRefresh(); };
+  private startAutoRefresh() { this.stopAutoRefresh(); this.refreshTimer = window.setInterval(() => this.loadAll(), this.refreshIntervalMs); }
+  private stopAutoRefresh() { if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; } }
+  private async copyInvoice() { if (!this.createdInvoice) return; try { await navigator.clipboard.writeText(this.createdInvoice); this.copyOk = true; setTimeout(() => (this.copyOk = false),1500); } catch (err) { console.warn("Copy failed", err); } }
+  private async sendRowAction(endpoint: string, paymentHash: string) { this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: true }; this.rowActionError = { ...this.rowActionError, [paymentHash]: "" }; try { const res = await fetch(`/umbraco/management/api/lightningpayments/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentHash }) }); if (!res.ok) throw new Error(`HTTP ${res.status}`); await this.loadPayments(); } catch (err: any) { this.rowActionError = { ...this.rowActionError, [paymentHash]: err?.message ?? "Action failed" }; } finally { this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: false }; } }
 
   render() {
     return html`
       <umb-body-layout header-transparent>
-        <div slot="header">
-          <h2>Lightning Payments</h2>
-        </div>
+        <div slot="header"><h2>Lightning Payments</h2></div>
         <div slot="main">
           ${this.renderStatus()}
+          ${this.renderQuote()}
           ${this.renderTestTools()}
           ${this.renderPaymentsTable()}
         </div>
-      </umb-body-layout>
-    `;
+      </umb-body-layout>`;
   }
 
   private renderStatus() {
@@ -268,32 +226,31 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
       <uui-box headline="Status" style="margin-bottom: var(--uui-size-layout-1)">
         <div class="toolbar">
           <uui-button look="secondary" @click=${this.onRefreshClick} ?disabled=${this.refreshing}>${this.refreshing ? "Refreshing…" : "Refresh"}</uui-button>
-          <label class="auto">
-            <input type="checkbox" .checked=${this.autoRefresh} @change=${this.toggleAutoRefresh} />
-            <span>Auto-refresh</span>
-          </label>
+          <label class="auto"><input type="checkbox" .checked=${this.autoRefresh} @change=${this.toggleAutoRefresh} /><span>Auto-refresh</span></label>
         </div>
-        ${this.loadingStatus
-          ? html`<div>Loading status…</div>`
-          : this.errorStatus
-          ? html`<uui-alert color="danger">${this.errorStatus}</uui-alert>`
-          : html`
-              <div class="status-grid">
-                <div><strong>SDK Connected:</strong> ${this.connected ? "Yes" : "No"}</div>
-                <div><strong>Offline Mode:</strong> ${this.offlineMode ? "Yes" : "No"}</div>
-                <div><strong>Lightning Limits:</strong> ${this.minSat != null && this.maxSat != null ? `${this.minSat} – ${this.maxSat} sats` : "Unknown"}</div>
-              </div>
-              ${this.recommendedFees
-                ? html`
-                    <details class="fees-details">
-                      <summary>Recommended on-chain fees</summary>
-                      <pre>${JSON.stringify(this.recommendedFees, null, 2)}</pre>
-                    </details>
-                  `
-                : ""}
-            `}
-      </uui-box>
-    `;
+        ${this.loadingStatus ? html`<div>Loading status…</div>` : this.errorStatus ? html`<uui-alert color="danger">${this.errorStatus}</uui-alert>` : html`
+          <div class="status-grid">
+            <div><strong>SDK Connected:</strong> ${this.connected ? "Yes" : "No"}</div>
+            <div><strong>Offline Mode:</strong> ${this.offlineMode ? "Yes" : "No"}</div>
+            <div><strong>Lightning Limits:</strong> ${this.minSat != null && this.maxSat != null ? `${this.minSat} – ${this.maxSat} sats` : "Unknown"}</div>
+            <div><strong>Health:</strong> ${this.health?.status ?? "Unknown"}</div>
+          </div>
+          ${this.recommendedFees ? html`<details class="fees-details"><summary>Recommended on-chain fees</summary><pre>${JSON.stringify(this.recommendedFees, null,2)}</pre></details>` : ""}
+        `}
+      </uui-box>`;
+  }
+
+  private renderQuote() {
+    return html`
+      <uui-box headline="Receive fee quote" style="margin-bottom: var(--uui-size-layout-1)">
+        <div class="quote-row">
+          <uui-label for="q-amount">Amount (sats)</uui-label>
+          <uui-input id="q-amount" type="number" min="1" step="1" .value=${String(this.quoteAmount)} @input=${(e: any) => this.quoteAmount = Math.max(1, parseInt(e.target.value ||1,10))}></uui-input>
+          <uui-button look="primary" @click=${this.getQuote} ?disabled=${this.quoting}>${this.quoting ? "Quoting…" : "Get quote"}</uui-button>
+        </div>
+        ${this.quoteError ? html`<uui-alert color="danger">${this.quoteError}</uui-alert>` : ""}
+        ${this.quoteResult ? html`<div class="quote-out">Estimated fees: <strong>${this.quoteResult.feesSat}</strong> sats (${this.quoteResult.method})</div>` : ""}
+      </uui-box>`;
   }
 
   private renderTestTools() {
@@ -409,61 +366,30 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
 
   static styles = [
     css`
-      :host {
-        display: block;
-        padding: var(--uui-size-layout-1);
-      }
-
-      uui-box {
-        margin-bottom: var(--uui-size-layout-1);
-      }
-
-      h2 {
-        margin-top: 0;
-      }
-
-      .toolbar {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        margin-bottom: 0.5rem;
-      }
-
-      .auto {
-        display: flex;
-        gap: 0.35rem;
-        align-items: center;
-        color: var(--uui-color-text);
-      }
-
-      .status-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 0.5rem 1rem;
-      }
-
-      .fees-details {
-        margin-top: 0.5rem;
-      }
-
+      :host { display:block; padding: var(--uui-size-layout-1); }
+      uui-box { margin-bottom: var(--uui-size-layout-1); }
+      h2 { margin-top: 0; }
+      .toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; }
+      .auto { display:flex; gap:0.35rem; align-items:center; color: var(--uui-color-text); }
+      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem1rem; }
+      .fees-details { margin-top:0.5rem; }
+      .quote-row { display:grid; grid-template-columns:1fr1fr auto; gap:0.5rem; align-items:end; }
+      .quote-out { margin-top:0.5rem; }
       .test-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 1rem;
         align-items: end;
       }
-
       .test-actions {
         margin-top: 0.5rem;
       }
-
       .invoice-out {
         margin-top: 1rem;
         display: grid;
         grid-template-columns: 240px 1fr;
         gap: 1rem;
       }
-
       .qr {
         width: 240px;
         height: 240px;
@@ -472,19 +398,16 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
         border-radius: 4px;
         padding: 4px;
       }
-
       .invoice-text uui-textarea {
         width: 100%;
         height: 120px;
       }
-
       .actions {
         display: flex;
         gap: 0.5rem;
         align-items: center;
         margin-top: 0.5rem;
       }
-
       .open-wallet {
         text-decoration: none;
         background: var(--uui-color-highlight);
@@ -492,19 +415,16 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
         padding: 0.4rem 0.6rem;
         border-radius: 4px;
       }
-
       .hash {
         margin-top: 0.5rem;
         color: var(--uui-color-text-alt);
         font-family: monospace;
       }
-
       .row-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 0.25rem;
       }
-
       .row-error {
         margin-top: 0.25rem;
         color: var(--uui-color-danger);
@@ -516,8 +436,4 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
 
 export default LightningPaymentsDashboardElement;
 
-declare global {
-  interface HTMLElementTagNameMap {
-    "lightning-payments-dashboard": LightningPaymentsDashboardElement;
-  }
-}
+declare global { interface HTMLElementTagNameMap { "lightning-payments-dashboard": LightningPaymentsDashboardElement; } }
