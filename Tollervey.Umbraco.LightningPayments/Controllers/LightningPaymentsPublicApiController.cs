@@ -21,6 +21,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  [RequireHttps]
  [AllowAnonymous]
  [Route("api/public/lightning")] // Keep outside /umbraco so the website can call anonymously
+ [Produces("application/json")]
  public class LightningPaymentsPublicApiController : ControllerBase
  {
  private readonly IBreezSdkService _breezSdkService;
@@ -45,15 +46,24 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  _runtimeMode = runtimeMode;
  }
 
+ private IActionResult Error(int statusCode, string error, string message)
+ {
+ return StatusCode(statusCode, new ApiError { error = error, message = message });
+ }
+
  /// <summary>
  /// Generate a Bolt11 invoice for the content paywall (anonymous).
  /// </summary>
  [HttpGet("GetPaywallInvoice")]
+ [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+ [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
+ [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
+ [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
  public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
  {
  if (contentId <=0)
  {
- return BadRequest("Invalid content ID.");
+ return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
  }
 
  try
@@ -61,11 +71,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  var (content, paywallConfig) = GetContentAndPaywallConfig(contentId);
  if (content == null || paywallConfig == null)
  {
- return NotFound("Content or paywall configuration not found.");
+ return Error(StatusCodes.Status404NotFound, "not_found", "Content or paywall configuration not found.");
  }
  if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
  {
- return BadRequest("Paywall is not enabled or fee is not set.");
+ return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
  }
 
  _logger.LogInformation("[Public] Invoice requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
@@ -74,7 +84,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  var paymentHash = await TryGetPaymentHash(invoice);
  if (string.IsNullOrWhiteSpace(paymentHash))
  {
- return BadRequest("Failed to obtain invoice payment hash.");
+ return Error(StatusCodes.Status400BadRequest, "invalid_invoice", "Failed to obtain invoice payment hash.");
  }
 
  var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString();
@@ -89,10 +99,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
  return Ok(new { invoice, paymentHash });
  }
+ catch (InvalidInvoiceRequestException ex)
+ {
+ _logger.LogWarning(ex, "Invalid invoice request for content {ContentId}", contentId);
+ return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message);
+ }
  catch (Exception ex)
  {
  _logger.LogError(ex, "Error generating paywall invoice for contentId {ContentId}", contentId);
- return StatusCode(500, "An error occurred while generating the invoice.");
+ return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while generating the invoice.");
  }
  }
 
@@ -100,10 +115,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  /// Gets the payment status for the current session and content (anonymous).
  /// </summary>
  [HttpGet("GetPaymentStatus")]
+ [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+ [ProducesResponseType(typeof(ApiError), StatusCodes.Status401Unauthorized)]
  public async Task<IActionResult> GetPaymentStatus([FromQuery] int contentId)
  {
  var sessionId = Request.Cookies[PaywallMiddleware.PaywallCookieName];
- if (string.IsNullOrEmpty(sessionId)) return Unauthorized();
+ if (string.IsNullOrEmpty(sessionId)) return Error(StatusCodes.Status401Unauthorized, "unauthorized", "Session cookie not found.");
 
  var state = await _paymentStateService.GetPaymentStateAsync(sessionId, contentId);
  return Ok(new { status = state?.Status.ToString() });
@@ -151,7 +168,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  {
  return BadRequest("Amount does not match the required fee.");
  }
-
  string description = $"Access to {content.Name} (ID: {contentId})";
  var invoice = await _breezSdkService.CreateInvoiceAsync(sats, description);
  var paymentHash = await TryGetPaymentHash(invoice);
@@ -201,7 +217,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  {
  return BadRequest("Paywall is not enabled or fee is not set.");
  }
-
  _logger.LogInformation("[Public] Bolt12 offer requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
  var offer = await _breezSdkService.CreateBolt12OfferAsync(paywallConfig.Fee, $"Access to content ID {contentId}");
  return Ok(offer);
@@ -322,5 +337,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  public ulong AmountSat { get; set; }
  public int? ContentId { get; set; }
  public string? Label { get; set; }
+ }
+ public class ApiError
+ {
+ public string error { get; set; } = string.Empty;
+ public string message { get; set; } = string.Empty;
  }
 }
