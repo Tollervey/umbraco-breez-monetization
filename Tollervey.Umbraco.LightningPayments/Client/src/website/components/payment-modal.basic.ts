@@ -20,6 +20,7 @@ export class BreezPaymentModalBasic extends LitElement {
  // Localizable/Configurable labels
  @property({ type: String, attribute: 'generate-label' }) generateLabel = 'Generate Invoice';
  @property({ type: String, attribute: 'generating-label' }) generatingLabel = 'Generating…';
+ @property({ type: String, attribute: 'regenerate-label' }) regenerateLabel = 'Generate new invoice';
  @property({ type: String, attribute: 'close-label' }) closeLabel = 'Close';
  @property({ type: String, attribute: 'missing-content-label' }) missingContentLabel = 'Missing or invalid content id';
  @property({ type: String, attribute: 'create-error-label' }) createErrorLabel = 'Failed to create invoice';
@@ -30,6 +31,7 @@ export class BreezPaymentModalBasic extends LitElement {
  @state() private _loading = false;
  @state() private _error = '';
  @state() private _remaining = '';
+ @state() private _isExpired = false;
  private _countdownTimer: number | null = null;
 
  private _previouslyFocused: Element | null = null;
@@ -105,17 +107,20 @@ export class BreezPaymentModalBasic extends LitElement {
  private _updateCountdown() {
  if (!this.expiry) {
  this._remaining = '';
+ this._isExpired = false;
  return;
  }
  const expiryTs = Date.parse(this.expiry);
  if (isNaN(expiryTs)) {
  this._remaining = '';
+ this._isExpired = false;
  return;
  }
  const now = Date.now();
  const ms = expiryTs - now;
  if (ms <=0) {
  this._remaining = this.expiredLabel;
+ this._isExpired = true;
  this._clearCountdown();
  return;
  }
@@ -123,10 +128,12 @@ export class BreezPaymentModalBasic extends LitElement {
  const m = Math.floor(totalSec /60);
  const s = totalSec %60;
  this._remaining = `${this.expiresInLabel} ${m}:${s.toString().padStart(2,'0')}`;
+ this._isExpired = false;
  }
 
  private _startCountdown() {
  this._clearCountdown();
+ this._isExpired = false;
  this._updateCountdown();
  this._countdownTimer = window.setInterval(() => this._updateCountdown(),1000);
  }
@@ -136,6 +143,19 @@ export class BreezPaymentModalBasic extends LitElement {
  clearInterval(this._countdownTimer);
  this._countdownTimer = null;
  }
+ }
+
+ private _resetInvoiceState() {
+ this._invoice = undefined;
+ this.expiry = undefined;
+ this._remaining = '';
+ this._isExpired = false;
+ }
+
+ private async _regenerateInvoice() {
+ if (this._loading) return;
+ this._resetInvoiceState();
+ await this._generateInvoice();
  }
 
  async _generateInvoice() {
@@ -151,7 +171,7 @@ export class BreezPaymentModalBasic extends LitElement {
  const data = await res.json();
  this._invoice = { bolt11: data.invoice, paymentHash: data.paymentHash };
  this.expiry = data.expiry ?? undefined;
- if (this.expiry) this._startCountdown();
+ if this.expiry) this._startCountdown();
  this.dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: data.paymentHash }, bubbles: true, composed: true }));
  } catch (err: any) {
  this._error = err?.message ?? this.createErrorLabel;
@@ -167,9 +187,7 @@ export class BreezPaymentModalBasic extends LitElement {
  this._lockScroll(true);
  // Reset transient state when opening, unless a pre-supplied invoice is provided
  if (!this.invoice) {
- this._invoice = undefined;
- this.expiry = undefined;
- this._remaining = '';
+ this._resetInvoiceState();
  }
  this._error = '';
  // Defer to ensure DOM is rendered
@@ -226,6 +244,11 @@ export class BreezPaymentModalBasic extends LitElement {
  <breez-qr-code-display .data=${this._invoice.bolt11}></breez-qr-code-display>
  <breez-invoice-display .invoice=${this._invoice.bolt11}></breez-invoice-display>
  ${this._remaining ? html`<div class="expiry" role="status" aria-live="polite">${this._remaining}</div>` : nothing}
+ ${this._isExpired ? html`
+ <button class="secondary" @click=${this._regenerateInvoice} ?disabled=${this._loading}>
+ ${this.regenerateLabel}
+ </button>
+ ` : nothing}
  `}
  </section>
  </div>
@@ -243,6 +266,7 @@ export class BreezPaymentModalBasic extends LitElement {
  .primary { background: var(--lp-color-primary); border:0; color: var(--lp-color-bg); padding:0.7rem1rem; border-radius: var(--lp-radius); cursor:pointer; }
  .primary:hover { background: var(--lp-color-primary-hover); }
  .primary[aria-busy="true"] { opacity:0.8; cursor:wait; }
+ .secondary { background: transparent; color: var(--lp-color-text); border: var(--lp-border); padding:0.5rem1rem; border-radius: var(--lp-radius); cursor:pointer; }
  .error { color: var(--lp-color-danger); padding:0.5rem0; }
  .desc { color: var(--lp-color-text-muted); }
  .expiry { color: var(--lp-color-text-muted); font-size:0.9rem; }
