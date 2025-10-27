@@ -2,8 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
@@ -291,7 +289,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
         { 
-            return _invoiceHelper.BuildLnurlPayInfo(contentId, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice", _logger); 
+            // Use the public LNURL callback to avoid duplicating endpoints
+            return _invoiceHelper.BuildLnurlPayInfo(contentId, Request, "/api/public/lightning/GetLnurlInvoice", _logger); 
         }
 
         /// <summary>

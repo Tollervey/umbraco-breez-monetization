@@ -2,15 +2,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Tollervey.Umbraco.LightningPayments.UI.Services;
-using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.Web;
-using Umbraco.Extensions;
 using Tollervey.Umbraco.LightningPayments.UI.Services.RateLimiting;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
@@ -32,8 +28,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  private readonly ILightningPaymentsRuntimeMode _runtimeMode;
  private readonly IRateLimiter _rateLimiter;
  private readonly IInvoiceHelper _invoiceHelper;
-
- private static readonly Regex OfflineHashRegex = new(@"(?:^|-)p=([0-9a-f]{64})(?:-|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
  public LightningPaymentsPublicApiController(
  IBreezSdkService breezSdkService,

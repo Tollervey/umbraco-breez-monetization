@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Tollervey.Umbraco.LightningPayments.UI.Models;
-using Umbraco.Cms.Core.Web;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
@@ -9,22 +8,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     [RequireHttps]
     public class WellKnownController : UmbracoApiControllerBase
     {
-        private readonly IUmbracoContextFactory _umbracoContextFactory;
         private readonly ILogger<WellKnownController> _logger;
+        private readonly IInvoiceHelper _invoiceHelper;
 
         public WellKnownController(
-            IUmbracoContextFactory umbracoContextFactory,
-            ILogger<WellKnownController> logger)
+            ILogger<WellKnownController> logger,
+            IInvoiceHelper invoiceHelper)
         {
-            _umbracoContextFactory = umbracoContextFactory;
             _logger = logger;
+            _invoiceHelper = invoiceHelper;
         }
 
         [HttpGet("/.well-known/lnurlp/{name}")]
         public IActionResult GetLightningAddress(string name, [FromQuery] int contentId)
         {
-            // The LNURL metadata callback should point to the public controller now
-            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/api/public/lightning/GetLnurlInvoice");
+            // Delegate to shared helper that encapsulates Umbraco access and cookie handling
+            return _invoiceHelper.BuildLnurlPayInfo(contentId, Request, "/api/public/lightning/GetLnurlInvoice", _logger);
         }
     }
 }
