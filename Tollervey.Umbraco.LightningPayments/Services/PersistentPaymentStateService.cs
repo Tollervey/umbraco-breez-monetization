@@ -23,12 +23,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 await using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    var existing = await _context.PaymentStates
-                        .FirstOrDefaultAsync(p => p.UserSessionId == userSessionId && p.ContentId == contentId && p.Status == PaymentStatus.Pending);
-
-                    if (existing != null)
+                    // Only de-dupe for paywall content (contentId >0). For tips (contentId ==0), allow multiple pendings per session.
+                    if (contentId > 0)
                     {
-                        _context.PaymentStates.Remove(existing);
+                        var existing = await _context.PaymentStates
+                            .FirstOrDefaultAsync(p => p.UserSessionId == userSessionId && p.ContentId == contentId && p.Status == PaymentStatus.Pending);
+
+                        if (existing != null)
+                        {
+                            _context.PaymentStates.Remove(existing);
+                        }
                     }
 
                     var state = new PaymentState

@@ -18,11 +18,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                     ContentId = contentId,
                     UserSessionId = userSessionId,
                     Status = PaymentStatus.Pending,
-                    AmountSat = 0UL,
+                    AmountSat =0UL,
                     Kind = PaymentKind.Paywall
                 };
                 _paymentStatesByHash.TryAdd(paymentHash, state);
-                _paymentHashBySession.TryAdd($"{userSessionId}:{contentId}", paymentHash);
+                // Only map session->content for paywall items (contentId>0) to de-dupe; allow multiple tips (contentId==0)
+                if (contentId >0)
+                {
+                    _paymentHashBySession.AddOrUpdate($"{userSessionId}:{contentId}", paymentHash, (_, __) => paymentHash);
+                }
                 return Task.CompletedTask;
             }
             catch (Exception ex)
@@ -47,10 +51,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             {
                 if (_paymentStatesByHash.TryGetValue(paymentHash, out var state))
                 {
-                    if (state.Status == PaymentStatus.Paid)
-                    {
-                        return Task.FromResult(PaymentConfirmationResult.AlreadyConfirmed);
-                    }
+                    if (state.Status == PaymentStatus.Paid) return Task.FromResult(PaymentConfirmationResult.AlreadyConfirmed);
                     if (state.Status == PaymentStatus.Pending)
                     {
                         state.Status = PaymentStatus.Paid;
@@ -70,6 +71,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         {
             try
             {
+                if (contentId <=0)
+                {
+                    // tips are not linked to content; return null for this lookup
+                    return Task.FromResult<PaymentState?>(null);
+                }
                 if (_paymentHashBySession.TryGetValue($"{userSessionId}:{contentId}", out var paymentHash) && _paymentStatesByHash.TryGetValue(paymentHash, out var state))
                 {
                     return Task.FromResult<PaymentState?>(state);
