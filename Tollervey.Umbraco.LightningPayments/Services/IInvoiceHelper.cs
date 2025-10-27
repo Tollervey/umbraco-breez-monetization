@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
@@ -15,6 +17,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  Task<string?> TryGetPaymentHashAsync(string invoice);
  Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description);
  string EnsureSessionCookie(HttpRequest request, HttpResponse response, string? explicitState = null);
+ IActionResult BuildLnurlPayInfo(int contentId, HttpRequest request, string callbackPath, ILogger logger);
  }
 
  internal sealed class InvoiceHelper : IInvoiceHelper
@@ -81,6 +84,38 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  : (request.Cookies[Middleware.PaywallMiddleware.PaywallCookieName] ?? Guid.NewGuid().ToString());
  response.Cookies.Append(Middleware.PaywallMiddleware.PaywallCookieName, sessionId, new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict });
  return sessionId;
+ }
+
+ public IActionResult BuildLnurlPayInfo(int contentId, HttpRequest request, string callbackPath, ILogger logger)
+ {
+ if (contentId <=0)
+ {
+ return new BadRequestObjectResult("Invalid content ID.");
+ }
+ try
+ {
+ var (content, paywallConfig) = GetContentAndPaywallConfig(contentId);
+ if (content == null || paywallConfig == null)
+ {
+ return new NotFoundObjectResult("Content or paywall configuration not found.");
+ }
+ if (!paywallConfig.Enabled || paywallConfig.Fee ==0)
+ {
+ return new BadRequestObjectResult("Paywall is not enabled or fee is not set.");
+ }
+ // ensure session and attach it as state for wallet callback
+ var sessionId = EnsureSessionCookie(request, request.HttpContext.Response);
+ var callback = $"{request.Scheme}://{request.Host}{callbackPath}?contentId={contentId}&state={Uri.EscapeDataString(sessionId)}";
+ var metadata = $"""[[\"text/plain\",\"Access to {content.Name}\"]]""";
+ ulong minSendable = paywallConfig.Fee *1000UL;
+ ulong maxSendable = minSendable;
+ return new OkObjectResult(new { tag = "payRequest", callback, minSendable, maxSendable, metadata });
+ }
+ catch (Exception ex)
+ {
+ logger.LogError(ex, "Error generating LNURL-Pay info for contentId {ContentId}", contentId);
+ return new ObjectResult("An error occurred while generating LNURL-Pay info.") { StatusCode =500 };
+ }
  }
  }
 }

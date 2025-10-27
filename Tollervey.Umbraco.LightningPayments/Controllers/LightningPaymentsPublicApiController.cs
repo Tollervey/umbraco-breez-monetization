@@ -100,7 +100,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  /// </summary>
  [HttpGet("GetLnurlPayInfo")]
  public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
- { return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextFactory, _logger, Request, "/api/public/lightning/GetLnurlInvoice"); }
+ { return _invoiceHelper.BuildLnurlPayInfo(contentId, Request, "/api/public/lightning/GetLnurlInvoice", _logger); }
 
  /// <summary>
  /// LNURL-Pay callback to create a Bolt11 invoice (anonymous). Amount is in millisats.

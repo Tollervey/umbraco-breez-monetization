@@ -292,7 +292,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         public IActionResult GetLnurlPayInfo([FromQuery] int contentId)
         { 
-            return LnurlPayHelper.GetLnurlPayInfo(contentId, null!, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice"); 
+            return _invoiceHelper.BuildLnurlPayInfo(contentId, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice", _logger); 
         }
 
         /// <summary>
