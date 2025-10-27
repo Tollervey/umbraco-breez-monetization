@@ -1,0 +1,6 @@
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
+@{
+ var contentId = Model?.Id as int? ?? (int)(Model?.Content?.Id ??0);
+}
+
+<breez-paywall content-id="@contentId" buttonlabel="Pay to unlock" title="Unlock content" description="One-time Lightning payment to access this content."></breez-paywall>
