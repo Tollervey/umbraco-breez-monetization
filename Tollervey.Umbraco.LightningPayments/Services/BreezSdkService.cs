@@ -602,7 +602,47 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                     return;
                 }
 
-                _logger.LogInformation("BreezSDK: Received event of type {EventType}: {EventDetails}", e.GetType().Name, e.ToString());
+                // Avoid logging the full event payload which may contain sensitive data (invoices, preimages, etc.).
+                string eventType = e.GetType().Name;
+                string? paymentHash = null;
+                try
+                {
+                    // Try to extract a paymentHash if present using reflection. Keep this minimal and tolerant to binding changes.
+                    var detailsProp = e.GetType().GetProperty("details");
+                    if (detailsProp != null)
+                    {
+                        var details = detailsProp.GetValue(e);
+                        if (details != null)
+                        {
+                            var paymentDetailsProp = details.GetType().GetProperty("details");
+                            if (paymentDetailsProp != null)
+                            {
+                                var paymentDetails = paymentDetailsProp.GetValue(details);
+                                if (paymentDetails != null)
+                                {
+                                    var hashProp = paymentDetails.GetType().GetProperty("paymentHash");
+                                    if (hashProp != null)
+                                    {
+                                        paymentHash = hashProp.GetValue(paymentDetails) as string;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to extract paymentHash from SDK event for sanitized logging.");
+                }
+
+                if (!string.IsNullOrEmpty(paymentHash))
+                {
+                    _logger.LogInformation("BreezSDK: Received event {EventType} with paymentHash {PaymentHash}", eventType, paymentHash);
+                }
+                else
+                {
+                    _logger.LogInformation("BreezSDK: Received event {EventType}", eventType);
+                }
 
                 using var scope = _serviceProvider.CreateScope();
                 var breezEventProcessor = scope.ServiceProvider.GetRequiredService<IBreezEventProcessor>();
@@ -612,7 +652,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                     _ = breezEventProcessor.EnqueueEvent(succeeded);
                 }
 
-                // Forward all events (including PaymentSucceeded) for generic broadcasting/logging
+                // Forward all events (including PaymentSucceeded) for generic broadcasting/logging. The processor will only broadcast sanitized fields.
                 _ = breezEventProcessor.Enqueue(e);
             }
         }

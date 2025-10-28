@@ -64,7 +64,45 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var sseHub = scope.ServiceProvider.GetRequiredService<SseHub>();
-                    var payload = new { type = e.GetType().Name, details = e.ToString() };
+
+                    // Build a sanitized payload that excludes any raw invoice, preimage, or other sensitive strings.
+                    var payload = new Dictionary<string, object?> { { "type", e.GetType().Name } };
+
+                    try
+                    {
+                        // Attempt to extract a paymentHash in a safe way and include it if found.
+                        var detailsProp = e.GetType().GetProperty("details");
+                        if (detailsProp != null)
+                        {
+                            var details = detailsProp.GetValue(e);
+                            if (details != null)
+                            {
+                                var paymentDetailsProp = details.GetType().GetProperty("details");
+                                if (paymentDetailsProp != null)
+                                {
+                                    var paymentDetails = paymentDetailsProp.GetValue(details);
+                                    if (paymentDetails != null)
+                                    {
+                                        var hashProp = paymentDetails.GetType().GetProperty("paymentHash");
+                                        if (hashProp != null)
+                                        {
+                                            var paymentHash = hashProp.GetValue(paymentDetails) as string;
+                                            if (!string.IsNullOrWhiteSpace(paymentHash))
+                                            {
+                                                // only include a truncated hash to avoid leaking full preimage/invoice
+                                                payload["paymentHash"] = paymentHash.Length > 16 ? paymentHash[..16] + "..." : paymentHash;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to extract sanitized fields from Breez SDK event.");
+                    }
+
                     // Broadcast to all connected sessions (use a special key "*" to mean broadcast-all)
                     sseHub.Broadcast("*", "breez-event", payload);
                 }
@@ -132,7 +170,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                     var state = await paymentService.GetByPaymentHashAsync(paymentHash);
                     if (state != null && !string.IsNullOrWhiteSpace(state.UserSessionId))
                     {
-                        sseHub.Broadcast(state.UserSessionId, "payment-succeeded", new { paymentHash = state.PaymentHash, contentId = state.ContentId, kind = state.Kind.ToString(), status = state.Status.ToString(), amountSat = state.AmountSat });
+                        // Broadcast a minimal payload for the session; avoid exposing full payment data.
+                        sseHub.Broadcast(state.UserSessionId, "payment-succeeded", new { paymentHash = state.PaymentHash?.Length > 16 ? state.PaymentHash.Substring(0, 16) + "..." : state.PaymentHash, contentId = state.ContentId, kind = state.Kind.ToString(), status = state.Status.ToString(), amountSat = state.AmountSat });
                     }
 
                     activity?.SetStatus(ActivityStatusCode.Ok);
