@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0;</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
@@ -9,6 +9,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Suppress missing XML docs warnings to keep builds clean while shipping docs -->
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <BuildClientOnPack>true</BuildClientOnPack>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -77,13 +78,27 @@
     <Folder Include="Migrations\" />
   </ItemGroup>
 
-  <!-- Restore and build Client files -->
-  <Target Name="RestoreClient" Inputs="Client\package.json;Client\package-lock.json" Outputs="Client\node_modules\.package-lock.json">
-    <Message Importance="high" Text="Restoring Client NPM packages..." />
-    <Exec Command="npm i" WorkingDirectory="Client" />
+  <Target Name="DetectNodeTools" Condition="'$(BuildClientOnPack)' == 'true'" BeforeTargets="Pack">
+    <Exec Command="node --version" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+    </Exec>
+    <Exec Command="npm --version" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="NpmExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <NodeFound Condition="'$(NodeExitCode)' == '0'">true</NodeFound>
+      <NpmFound Condition="'$(NpmExitCode)' == '0'">true</NpmFound>
+    </PropertyGroup>
+    <Error Condition="'$(NodeFound)' != 'true'" Text="Node.js is required to build client assets. Install Node.js or set BuildClientOnPack=false to skip building client assets during packing." />
+    <Error Condition="'$(NpmFound)' != 'true'" Text="npm is required to build client assets. Install npm (comes with Node.js) or set BuildClientOnPack=false to skip building client assets during packing." />
   </Target>
 
-  <Target Name="BuildClient" BeforeTargets="AssignTargetPaths" DependsOnTargets="RestoreClient" Inputs="@(ClientAssetsInputs)" Outputs="$(IntermediateOutputPath)client.complete.txt">
+  <Target Name="RestoreClient" Inputs="Client\package.json;Client\package-lock.json" Outputs="Client\node_modules\.package-lock.json" DependsOnTargets="DetectNodeTools" Condition="'$(BuildClientOnPack)' == 'true' and Exists('Client\package.json')" BeforeTargets="Pack">
+    <Message Importance="high" Text="Restoring Client NPM packages (npm ci)..." />
+    <Exec Command="npm ci" WorkingDirectory="Client" />
+  </Target>
+
+  <Target Name="BuildClient" DependsOnTargets="RestoreClient" Inputs="@(ClientAssetsInputs)" Outputs="$(IntermediateOutputPath)client.complete.txt" Condition="'$(BuildClientOnPack)' == 'true' and Exists('Client\package.json')" BeforeTargets="Pack">
     <Message Importance="high" Text="Executing Client NPM build script..." />
     <Exec Command="npm run build" WorkingDirectory="Client" />
     <ItemGroup>
