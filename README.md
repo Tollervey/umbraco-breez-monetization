@@ -14,6 +14,17 @@ Quick start
 Offline mode
 - `builder.UseLightningPaymentsOffline(options => { /* ... */ });`
 
+Breez SDK working directory
+
+The Breez C# binding requires a local working directory to store wallet state, logs, and other SDK artifacts. By default the package initializes the SDK with a working directory under the application's content root:
+
+`<content-root>/App_Data/LightningPayments/`
+
+Recommendations:
+- Ensure the application process (IIS AppPool, systemd service user, etc.) has read/write access to this directory.
+- Back up the working directory if you need to preserve wallet seeds or state — treat it as sensitive data.
+- In containerized or ephemeral hosts (e.g., some cloud containers), mount a persistent volume for this path so state is durable across restarts.
+
 Rate limiting configuration
 
 This package exposes configurable rate limiting under the `LightningPayments:RateLimiting` configuration section. The defaults are conservative and disabled by default. To enable the ASP.NET Core built-in rate limiter for invoice-generation endpoints, set `Enabled` and `UseAspNetRateLimiter` to `true` and tune the limits as appropriate for your site.
@@ -98,7 +109,13 @@ Recommended ways to supply secrets
  - AWS Secrets Manager or similar secret stores
  - Configure the secret provider before `AddLightningPayments()` so values are present during options validation
 
-If you need to allow a non-standard secret provider or opt out of the enforcement for a specific environment, contact the project maintainer or add a small wrapper in your host app to configure `RateLimitingOptions`/settings as required before calling `AddLightningPayments()` (not recommended for general use).
+Working directory and secret storage guidance
+
+Summary checklist for production deployments:
+- Mount a persistent volume for `<content-root>/App_Data/LightningPayments/` and ensure the app user can read/write.
+- Store secret values (Breez API key, mnemonic, webhook secret, SMTP password) in a secure provider — environment variables, Key Vault, or equivalent.
+- Ensure secrets are available to the application configuration before `AddLightningPayments()` runs, so the validator can read them from the provider.
+- Back up any wallet-related working directory data only to secure storage; treat wallet material as highly sensitive.
 
 Troubleshooting
 - If enabling ASP.NET rate limiting, ensure your host application pipeline still calls `app.UseRateLimiter()` (the package composer attempts to enable it in the Umbraco pipeline).
