@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
 {
@@ -13,6 +14,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  /// </summary>
  public sealed class SseHub
  {
+ private readonly ILogger<SseHub> _logger;
+
+ public SseHub(ILogger<SseHub> logger)
+ {
+ _logger = logger;
+ }
+
  /// <summary>
  /// Represents a connected SSE client with an outbound message channel.
  /// </summary>
@@ -43,6 +51,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  var client = new SseClient();
  var bucket = _clientsBySession.GetOrAdd(sessionId, _ => new ConcurrentDictionary<Guid, SseClient>());
  bucket[client.Id] = client;
+ _logger.LogInformation("SseHub: Added client {ClientId} to session {SessionId}. Total clients in session: {Count}", client.Id, sessionId, bucket.Count);
  return client;
  }
 
@@ -56,10 +65,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  if (bucket.TryRemove(clientId, out var client))
  {
  try { client?.Complete(); } catch { /* ignore */ }
+ _logger.LogInformation("SseHub: Removed client {ClientId} from session {SessionId}.", clientId, sessionId);
  }
  if (bucket.IsEmpty)
  {
  _clientsBySession.TryRemove(sessionId, out _);
+ _logger.LogDebug("SseHub: Session {SessionId} bucket is empty and removed.", sessionId);
  }
  }
  }
@@ -79,9 +90,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  // TryWrite avoids queuing to closed writers. If it fails, remove the client.
  if (!client.Outbound.Writer.TryWrite(frame))
  {
+ _logger.LogDebug("SseHub: Failed to write to client {ClientId} in session {SessionId}; removing.", client.Id, sessionId);
  RemoveClient(sessionId, client.Id);
  }
  }
+ _logger.LogDebug("SseHub: Broadcasted event {Event} to session {SessionId} (payloadSize={Size})", @event, sessionId, JsonSerializer.Serialize(payload).Length);
  }
 
  /// <summary>
@@ -99,10 +112,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  var client = kvp.Value;
  if (!client.Outbound.Writer.TryWrite(frame))
  {
+ _logger.LogDebug("SseHub: Failed to write to client {ClientId} in session {SessionId}; removing.", client.Id, sessionId);
  RemoveClient(sessionId, client.Id);
  }
  }
  }
+ _logger.LogDebug("SseHub: BroadcastAll event {Event} to all sessions (payloadSize={Size})", @event, JsonSerializer.Serialize(payload).Length);
  }
 
  /// <summary>
@@ -117,9 +132,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  var client = kvp.Value;
  if (!client.Outbound.Writer.TryWrite(heartbeat))
  {
+ _logger.LogDebug("SseHub: Heartbeat failed for client {ClientId} in session {SessionId}; removing.", client.Id, sessionId);
  RemoveClient(sessionId, client.Id);
  }
  }
+ _logger.LogDebug("SseHub: Sent heartbeat to session {SessionId}", sessionId);
  }
 
  /// <summary>
@@ -137,10 +154,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  var client = kvp.Value;
  if (!client.Outbound.Writer.TryWrite(heartbeat))
  {
+ _logger.LogDebug("SseHub: Heartbeat failed for client {ClientId} in session {SessionId}; removing.", client.Id, sessionId);
  RemoveClient(sessionId, client.Id);
  }
  }
  }
+ _logger.LogDebug("SseHub: Sent heartbeat to all sessions.");
  }
 
  private static string BuildFrame(string @event, object payload)
