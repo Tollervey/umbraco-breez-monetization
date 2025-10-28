@@ -75,6 +75,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// Gets a payment state by its payment hash.
         /// </summary>
         Task<PaymentState?> GetByPaymentHashAsync(string paymentHash);
+
+        /// <summary>
+        /// Attempts to get an IdempotencyMapping by key.
+        /// </summary>
+        Task<IdempotencyMapping?> TryGetMappingByKeyAsync(string idempotencyKey);
+
+        /// <summary>
+        /// Attempts to atomically create a new IdempotencyMapping if key does not exist. Returns existing mapping if present.
+        /// </summary>
+        Task<(IdempotencyMapping mapping, bool created)> TryCreateMappingAsync(string idempotencyKey, string paymentHash, string invoice);
     }
 
     /// <summary>

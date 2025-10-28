@@ -92,6 +92,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 {
                     state.Status = PaymentStatus.Paid;
                     await _context.SaveChangesAsync();
+
+                    // If an idempotency mapping exists for this paymentHash, update its status as well
+                    var mapping = await _context.IdempotencyMappings.FirstOrDefaultAsync(m => m.PaymentHash == paymentHash);
+                    if (mapping != null)
+                    {
+                        mapping.Status = PaymentStatus.Paid;
+                        await _context.SaveChangesAsync();
+                    }
+
                     return PaymentConfirmationResult.Confirmed;
                 }
                 // For other statuses, do not confirm
@@ -219,6 +228,63 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             catch (Exception ex)
             {
                 throw new PaymentException("Failed to get payment by hash.", ex);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to get an IdempotencyMapping by key.
+        /// </summary>
+        public async Task<IdempotencyMapping?> TryGetMappingByKeyAsync(string idempotencyKey)
+        {
+            try
+            {
+                return await _context.IdempotencyMappings.FirstOrDefaultAsync(m => m.IdempotencyKey == idempotencyKey);
+            }
+            catch (Exception ex)
+            {
+                throw new PaymentException("Failed to lookup idempotency mapping.", ex);
+            }
+        }
+
+        /// <summary>
+        /// Attempts to atomically create a new IdempotencyMapping if key does not exist. Returns existing mapping if present.
+        /// </summary>
+        public async Task<(IdempotencyMapping mapping, bool created)> TryCreateMappingAsync(string idempotencyKey, string paymentHash, string invoice)
+        {
+            try
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    var existing = await _context.IdempotencyMappings.FirstOrDefaultAsync(m => m.IdempotencyKey == idempotencyKey);
+                    if (existing != null)
+                    {
+                        return (existing, false);
+                    }
+
+                    var mapping = new IdempotencyMapping
+                    {
+                        IdempotencyKey = idempotencyKey,
+                        PaymentHash = paymentHash,
+                        Invoice = invoice,
+                        CreatedAt = DateTime.UtcNow,
+                        Status = PaymentStatus.Pending
+                    };
+
+                    _context.IdempotencyMappings.Add(mapping);
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                    return (mapping, true);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new PaymentException("Failed to create idempotency mapping.", ex);
             }
         }
     }

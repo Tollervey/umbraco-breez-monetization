@@ -17,6 +17,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  /// <summary>
  /// Helper for common invoice-related flows including LNURL-P responses, session cookie management,
  /// and extracting metadata such as payment hash or expiry from invoices.
+ ///
+ /// NOTE: This helper now supports idempotency by accepting an optional `idempotencyKey` and
+ /// using the configured `IPaymentStateService` to atomically persist and lookup mappings.
+ /// The behavior: if a mapping exists for the key, the stored invoice/paymentHash is returned.
+ /// Otherwise a new invoice is created via Breez SDK and the mapping is persisted atomically.
  /// </summary>
  public interface IInvoiceHelper
  {
@@ -33,8 +38,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  /// <summary>
  /// Creates a new invoice and returns both the invoice string and extracted payment hash.
  /// Throws when the hash cannot be obtained.
+ /// Optional `idempotencyKey` may be provided by the caller and is preserved for downstream idempotency handling (persistence is out of scope for this change).
+ ///
+ /// Guidance:
+ /// - To avoid duplicate invoices, callers should send a client-generated idempotency key (e.g. a UUID).
+ /// - The server should persist a mapping from idempotencyKey -> paymentHash (and invoice string) atomically when creating a new invoice.
+ /// - If a subsequent request arrives with the same idempotencyKey, the server should return the previously-created invoice/paymentHash instead
+ /// of creating a new one. If the previously-created payment has already been confirmed, the server may return the confirmed state and
+ /// avoid presenting a new invoice.
  /// </summary>
- Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description);
+ Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description, string? idempotencyKey = null);
 
  /// <summary>
  /// Ensures the session cookie used for paywall state exists, returning its value.
@@ -59,13 +72,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  private readonly IUmbracoContextFactory _umbracoContextFactory;
  private readonly ILightningPaymentsRuntimeMode _runtimeMode;
  private readonly LightningPaymentsSettings _settings;
+ private readonly IPaymentStateService _paymentStateService;
 
- public InvoiceHelper(IBreezSdkService breezSdkService, IUmbracoContextFactory umbracoContextFactory, ILightningPaymentsRuntimeMode runtimeMode, IOptions<LightningPaymentsSettings> settings)
+ public InvoiceHelper(IBreezSdkService breezSdkService, IUmbracoContextFactory umbracoContextFactory, ILightningPaymentsRuntimeMode runtimeMode, IOptions<LightningPaymentsSettings> settings, IPaymentStateService paymentStateService)
  {
  _breezSdkService = breezSdkService;
  _umbracoContextFactory = umbracoContextFactory;
  _runtimeMode = runtimeMode;
  _settings = settings.Value;
+ _paymentStateService = paymentStateService;
  }
 
  public (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId)
@@ -93,11 +108,37 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  return null;
  }
 
- public async Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description)
+ public async Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description, string? idempotencyKey = null)
  {
+ // If idempotencyKey provided, attempt to return existing mapping to avoid duplicate invoices on retries.
+ if (!string.IsNullOrWhiteSpace(idempotencyKey))
+ {
+ var existing = await _paymentStateService.TryGetMappingByKeyAsync(idempotencyKey);
+ if (existing != null)
+ {
+ // If the mapping exists and the payment is confirmed, return the stored invoice/paymentHash.
+ // The mapping.Status is kept in sync when payments are confirmed through ConfirmPaymentAsync.
+ return (existing.Invoice, existing.PaymentHash);
+ }
+ }
+
+ // Not found or no idempotency key supplied — create a new invoice via Breez SDK
  var invoice = await _breezSdkService.CreateInvoiceAsync(amountSat, description);
  var hash = await TryGetPaymentHashAsync(invoice);
  if (string.IsNullOrWhiteSpace(hash)) throw new InvalidInvoiceRequestException("Failed to obtain invoice payment hash.");
+
+ // If idempotency key supplied, attempt to persist mapping atomically. If another request inserted the mapping
+ // concurrently, the TryCreateMappingAsync will return the existing mapping and we should use that instead.
+ if (!string.IsNullOrWhiteSpace(idempotencyKey))
+ {
+ var (mapping, created) = await _paymentStateService.TryCreateMappingAsync(idempotencyKey, hash, invoice);
+ if (!created)
+ {
+ // Another request already created a mapping; return the existing mapping instead of the newly-created invoice.
+ return (mapping.Invoice, mapping.PaymentHash);
+ }
+ }
+
  return (invoice, hash!);
  }
 

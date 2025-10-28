@@ -11,6 +11,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  /// <summary>
  /// Lightweight initializer that ensures the PaymentStates table exists and
  /// applies simple schema upgrades for new columns when running on SQLite.
+ /// Also ensures IdempotencyMappings table exists for idempotency support.
  /// </summary>
  internal sealed class PaymentDbInitializer : IHostedService
  {
@@ -59,6 +60,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  await EnsureColumnAsync(ctx, "PaymentStates", "AmountSat", "INTEGER NOT NULL DEFAULT0", ct);
  await EnsureColumnAsync(ctx, "PaymentStates", "Kind", "INTEGER NOT NULL DEFAULT0", ct);
 
+ // Ensure IdempotencyMappings table exists. Create minimal table if missing.
+ await EnsureIdempotencyTableAsync(ctx, ct);
+
  _logger.LogInformation("Payment database initialization completed successfully.");
  }, cancellationToken);
  }
@@ -103,6 +107,35 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
  await alter.ExecuteNonQueryAsync(ct);
  // Log that a schema change was applied
  // Note: callers should be conservative with schema changes in production environments.
+ }
+ }
+ }
+
+ private static async Task EnsureIdempotencyTableAsync(PaymentDbContext ctx, CancellationToken ct)
+ {
+ await using var conn = (SqliteConnection)ctx.Database.GetDbConnection();
+ if (conn.State != ConnectionState.Open) await conn.OpenAsync(ct);
+
+ // Check for table existence
+ await using (var cmd = conn.CreateCommand())
+ {
+ cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='IdempotencyMappings'";
+ var exists = false;
+ await using var reader = await cmd.ExecuteReaderAsync(ct);
+ if (await reader.ReadAsync(ct)) exists = true;
+
+ if (!exists)
+ {
+ // Create a minimal table suitable for our mapping
+ await using var create = conn.CreateCommand();
+ create.CommandText = @"CREATE TABLE IdempotencyMappings (
+ IdempotencyKey TEXT PRIMARY KEY,
+ PaymentHash TEXT NOT NULL,
+ Invoice TEXT NOT NULL,
+ CreatedAt TEXT NOT NULL,
+ Status INTEGER NOT NULL DEFAULT0
+ );";
+ await create.ExecuteNonQueryAsync(ct);
  }
  }
  }

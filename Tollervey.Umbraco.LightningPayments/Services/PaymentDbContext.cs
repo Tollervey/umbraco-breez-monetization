@@ -18,6 +18,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// </summary>
         public DbSet<PaymentState> PaymentStates { get; set; }
 
+        /// <summary>
+        /// Idempotency key mappings.
+        /// </summary>
+        public DbSet<IdempotencyMapping> IdempotencyMappings { get; set; }
+
         /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,6 +34,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             modelBuilder.Entity<PaymentState>()
                 .Property(p => p.Kind)
                 .HasDefaultValue(PaymentKind.Paywall);
+
+            modelBuilder.Entity<IdempotencyMapping>()
+                .HasKey(i => i.IdempotencyKey);
+
+            modelBuilder.Entity<IdempotencyMapping>()
+                .Property(i => i.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         }
     }
 }

@@ -10,6 +10,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
     {
         private readonly ConcurrentDictionary<string, PaymentState> _paymentStatesByHash = new();
         private readonly ConcurrentDictionary<string, string> _paymentHashBySession = new();
+        private readonly ConcurrentDictionary<string, IdempotencyMapping> _mappings = new();
 
         /// <inheritdoc />
         public Task AddPendingPaymentAsync(string paymentHash, int contentId, string userSessionId)
@@ -61,6 +62,16 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                     if (state.Status == PaymentStatus.Pending)
                     {
                         state.Status = PaymentStatus.Paid;
+
+                        // update mapping if exists
+                        foreach (var kvp in _mappings)
+                        {
+                            if (kvp.Value.PaymentHash == paymentHash)
+                            {
+                                kvp.Value.Status = PaymentStatus.Paid;
+                            }
+                        }
+
                         return Task.FromResult(PaymentConfirmationResult.Confirmed);
                     }
                     return Task.FromResult(PaymentConfirmationResult.NotFound);
@@ -178,6 +189,34 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         {
             _paymentStatesByHash.TryGetValue(paymentHash, out var state);
             return Task.FromResult<PaymentState?>(state);
+        }
+
+        /// <summary>
+        /// Attempts to get an IdempotencyMapping by key.
+        /// </summary>
+        public Task<IdempotencyMapping?> TryGetMappingByKeyAsync(string idempotencyKey)
+        {
+            _mappings.TryGetValue(idempotencyKey, out var mapping);
+            return Task.FromResult<IdempotencyMapping?>(mapping);
+        }
+
+        /// <summary>
+        /// Attempts to atomically create a new IdempotencyMapping if key does not exist. Returns existing mapping if present.
+        /// </summary>
+        public Task<(IdempotencyMapping mapping, bool created)> TryCreateMappingAsync(string idempotencyKey, string paymentHash, string invoice)
+        {
+            var mapping = _mappings.GetOrAdd(idempotencyKey, key => new IdempotencyMapping
+            {
+                IdempotencyKey = key,
+                PaymentHash = paymentHash,
+                Invoice = invoice,
+                CreatedAt = DateTime.UtcNow,
+                Status = PaymentStatus.Pending
+            });
+
+            // If mapping.PaymentHash equals the provided paymentHash and invoice, we created it; otherwise it existed.
+            var created = mapping.PaymentHash == paymentHash && mapping.Invoice == invoice && mapping.CreatedAt.AddSeconds(1) >= DateTime.UtcNow;
+            return Task.FromResult((mapping, created));
         }
     }
 }
