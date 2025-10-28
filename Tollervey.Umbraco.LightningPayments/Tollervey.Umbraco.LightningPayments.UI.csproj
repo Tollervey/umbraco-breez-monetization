@@ -29,6 +29,10 @@
     <RepositoryUrl>https://github.com/Tollervey/umbraco-breez-monetization</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- SPDX license expression; also include LICENSE file in the package -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- package icon (kept small) -->
+    <PackageIcon>icon.svg</PackageIcon>
     <!-- Symbols and deterministic builds -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -81,6 +85,13 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
+  </ItemGroup>
+
+  <!-- Include license, changelog and icon in the package -->
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="" />
+    <None Include="CHANGELOG.md" Pack="true" PackagePath="" />
+    <None Include="icon.svg" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <Target Name="DetectNodeTools" Condition="'$(BuildClientOnPack)' == 'true'" BeforeTargets="Pack">
