@@ -10,6 +10,9 @@ using System.Diagnostics;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Models;
 using Tollervey.Umbraco.LightningPayments.UI.Services;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
@@ -108,10 +111,91 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 _logger.LogInformation("Initializing Breez SDK...");
                 _wrapper.SetLogger(new SdkLogger(_logger));
 
-                var workingDir = Path.Combine(_hostEnvironment.ContentRootPath, $"App_Data/{LightningPaymentsSettings.SectionName}/");
+                // Determine working directory: use configured path if provided, otherwise default under content root.
+                string workingDir;
+                if (!string.IsNullOrWhiteSpace(_settings.WorkingDirectory))
+                {
+                    workingDir = _settings.WorkingDirectory!;
+                    // If a relative path was provided, make it relative to content root for predictability
+                    if (!Path.IsPathRooted(workingDir))
+                    {
+                        workingDir = Path.Combine(_hostEnvironment.ContentRootPath, workingDir);
+                    }
+                    _logger.LogInformation("Using configured Breez SDK working directory: {WorkingDir}", workingDir);
+                }
+                else
+                {
+                    workingDir = Path.Combine(_hostEnvironment.ContentRootPath, $"App_Data/{LightningPaymentsSettings.SectionName}/");
+                    _logger.LogInformation("Using default Breez SDK working directory under content root: {WorkingDir}", workingDir);
+
+                    // In production recommend configuring a dedicated secure path outside the webroot
+                    if (_hostEnvironment.IsProduction())
+                    {
+                        _logger.LogWarning("Default SDK working directory is under the application's content root. For security, consider configuring 'LightningPayments:WorkingDirectory' to a dedicated secure path outside the webroot and apply restrictive filesystem ACLs.");
+                    }
+                }
+
                 if (!Directory.Exists(workingDir))
                 {
                     Directory.CreateDirectory(workingDir);
+                }
+
+                // Attempt to apply conservative filesystem permissions on the working directory
+                try
+                {
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        try
+                        {
+                            var dirInfo = new DirectoryInfo(workingDir);
+                            var dirSecurity = dirInfo.GetAccessControl();
+                            // Protect ACL from inheritance and remove existing rules for Everyone
+                            dirSecurity.SetAccessRuleProtection(true, false);
+
+                            var identity = WindowsIdentity.GetCurrent();
+                            var userSid = identity?.User;
+                            if (userSid != null)
+                            {
+                                var rule = new FileSystemAccessRule(userSid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow);
+                                dirSecurity.AddAccessRule(rule);
+                                dirInfo.SetAccessControl(dirSecurity);
+                                _logger.LogInformation("Applied restrictive ACLs to Breez SDK working directory.");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to apply Windows ACLs to Breez SDK working directory. Ensure the directory has appropriate permissions.");
+                        }
+                    }
+                    else
+                    {
+                        // Try to chmod0700 on Unix-like systems. Best-effort: ignore failures.
+                        try
+                        {
+                            var psi = new ProcessStartInfo("chmod", $"700 \"{workingDir}\"") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+                            using var p = Process.Start(psi);
+                            if (p != null)
+                            {
+                                await p.WaitForExitAsync(ct);
+                                if (p.ExitCode == 0)
+                                {
+                                    _logger.LogInformation("Applied chmod700 to Breez SDK working directory.");
+                                }
+                                else
+                                {
+                                    _logger.LogDebug("chmod exited with code {ExitCode} when attempting to set permissions on {Dir}", p.ExitCode, workingDir);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "Failed to apply chmod to Breez SDK working directory; ensure permissions are set appropriately.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Non-fatal error while attempting to secure working directory.");
                 }
 
                 LiquidNetwork network = _settings.Network switch

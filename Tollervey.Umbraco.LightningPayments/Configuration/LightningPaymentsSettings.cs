@@ -130,6 +130,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// </summary>
         [MinLength(1)]
         public string HealthCheckPath { get; init; } = "/health/ready";
+
+        /// <summary>
+        /// Optional working directory for the Breez SDK. If not set, defaults to '<content-root>/App_Data/LightningPayments/'.
+        /// Consumers should prefer a dedicated secure path outside the webroot and ensure restrictive filesystem ACLs.
+        /// Example environment variable: "LightningPayments__WorkingDirectory"
+        /// </summary>
+        public string? WorkingDirectory { get; init; }
     }
 
 }
