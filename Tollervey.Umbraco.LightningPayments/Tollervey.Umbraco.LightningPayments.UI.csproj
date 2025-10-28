@@ -85,10 +85,6 @@
     <Content Include="Client\public\umbraco-package.json" Pack="true" PackagePath="App_Plugins\Tollervey.Umbraco.LightningPayments" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Migrations\" />
-  </ItemGroup>
-
   <!-- Include license, changelog and icon in the package -->
   <ItemGroup>
     <None Include="LICENSE" Pack="true" PackagePath="" />
