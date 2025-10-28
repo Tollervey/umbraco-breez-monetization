@@ -123,6 +123,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// Leave null/empty to use host-only cookie.
         /// </summary>
         public string? SessionCookieDomain { get; init; }
+
+        /// <summary>
+        /// Health check endpoint path. Defaults to "/health/ready".
+        /// Can be overridden by consumers via configuration.
+        /// </summary>
+        [MinLength(1)]
+        public string HealthCheckPath { get; init; } = "/health/ready";
     }
 
 }

@@ -48,7 +48,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
                     // Map health checks in the Endpoints stage.
                     Endpoints = app =>
                     {
-                        app.UseEndpoints(endpoints => endpoints.MapHealthChecks("/health/ready"));
+                        var settings = app.ApplicationServices.GetRequiredService<IOptions<LightningPaymentsSettings>>().Value;
+                        app.UseEndpoints(endpoints => endpoints.MapHealthChecks(settings.HealthCheckPath ?? "/health/ready"));
                     }
                 });
             });
