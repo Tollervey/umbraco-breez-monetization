@@ -21,6 +21,7 @@ export class BreezTipJarElement extends LitElement {
  @property({ type: String, attribute: 'please-wait-label' }) pleaseWaitLabel = 'Please wait…';
  @property({ type: String, attribute: 'thanks-label' }) thanksLabel = 'Thanks for your tip!';
  @property({ type: String, attribute: 'stats-error-label' }) statsErrorLabel = 'Failed to load stats';
+ @property({ type: String, attribute: 'refresh-label' }) refreshLabel = 'Refresh status';
 
  @state() private _selected: number =1000;
  @state() private _loading = false;
@@ -39,6 +40,8 @@ export class BreezTipJarElement extends LitElement {
  @state() private _thanks = false;
  private _pollTimer: number | null = null;
  private readonly _pollMs =2000;
+ @state() private _rtConnected = true;
+ @state() private _rtAttempts =0;
 
  connectedCallback(): void {
  super.connectedCallback();
@@ -57,6 +60,7 @@ export class BreezTipJarElement extends LitElement {
  try {
  this._evtSrc?.close();
  this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
+ this._evtSrc.onopen = () => { this._rtConnected = true; this._rtAttempts =0; };
  this._evtSrc.addEventListener('payment-succeeded', (ev: MessageEvent) => {
  try {
  const data = JSON.parse(ev.data);
@@ -70,7 +74,11 @@ export class BreezTipJarElement extends LitElement {
  }
  } catch { /* ignore */ }
  });
- this._evtSrc.onerror = () => { /* keep connection alive */ };
+ this._evtSrc.onerror = () => {
+ this._rtConnected = false; this._rtAttempts++;
+ const backoff = Math.min(30000,1000 * Math.pow(2, this._rtAttempts));
+ console.warn(`[tip-jar] realtime disconnected, attempt ${this._rtAttempts}, next retry ~${Math.round(backoff/1000)}s`);
+ };
  } catch { /* ignore */ }
  }
 
@@ -134,6 +142,22 @@ export class BreezTipJarElement extends LitElement {
  }
  }
 
+ private _refreshNow = async () => {
+ if (!this._paymentHash) return;
+ try {
+ const res = await fetch(`/api/public/lightning/GetPaymentStatusByHash?paymentHash=${encodeURIComponent(this._paymentHash)}`);
+ if (!res.ok) return;
+ const data = await res.json();
+ const s = (data?.status || '').toLowerCase();
+ if (s === 'paid') {
+ this._thanks = true;
+ this._modalOpen = false;
+ this._stopPolling();
+ this.loadStats();
+ }
+ } catch { /* ignore */ }
+ };
+
  render() {
  return html`
  <div class="tip-jar">
@@ -160,8 +184,15 @@ export class BreezTipJarElement extends LitElement {
  .description=${this.description}
  .invoice=${this._bolt11}
  .paymentHash=${this._paymentHash}
- @close=${() => { this._modalOpen = false; }}
+ @close=${() => { this._modalOpen = false; this._stopPolling(); }}
  ></breez-payment-modal>
+
+ ${this._bolt11 && !this._thanks ? html`
+ <div class="pending-tools">
+ <button class="refresh" @click=${this._refreshNow}>${this.refreshLabel}</button>
+ ${!this._rtConnected ? html`<div class="meta" aria-live="polite">Live updates offline, retrying… (attempt ${this._rtAttempts})</div>` : ''}
+ </div>
+ ` : ''}
  `;
  }
 
@@ -179,6 +210,9 @@ export class BreezTipJarElement extends LitElement {
  .error { color: #b00020; }
  .thanks { color: var(--lp-color-success, #2e7d32); font-weight:600; }
  .stats { color: #666; font-size:0.9rem; }
+ .pending-tools { margin-top:0.5rem; display:flex; gap:0.5rem; align-items:center; }
+ .refresh { background: transparent; border:1px solid #ddd; border-radius:6px; padding:0.3rem0.6rem; cursor: pointer; }
+ .meta { color: #666; font-size:0.85rem; }
  `;
 }
 

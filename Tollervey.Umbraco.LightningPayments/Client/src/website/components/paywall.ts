@@ -14,6 +14,7 @@ export class BreezPaywallElement extends LitElement {
  @property({ type: String, attribute: 'waiting-label' }) waitingLabel = 'Waiting for payment confirmation…';
  @property({ type: String, attribute: 'failed-label' }) failedLabel = 'Payment failed. Please try again.';
  @property({ type: String, attribute: 'expired-label' }) expiredLabel = 'Invoice expired. Generate a new one.';
+ @property({ type: String, attribute: 'refresh-label' }) refreshLabel = 'Refresh status';
 
  @state() private _status: 'unknown' | 'paid' | 'pending' | 'failed' | 'expired' | 'unpaid' = 'unknown';
  @state() private _loading: boolean = true;
@@ -23,6 +24,8 @@ export class BreezPaywallElement extends LitElement {
  private _evtSrc?: EventSource;
  private _pollTimer: number | null = null;
  private readonly _pollMs =2000;
+ @state() private _rtConnected = true;
+ @state() private _rtAttempts =0;
 
  connectedCallback(): void { super.connectedCallback(); this._checkStatus(); this._connectRealtime(); }
  disconnectedCallback(): void { super.disconnectedCallback(); this._evtSrc?.close(); this._evtSrc = undefined; this._stopPolling(); }
@@ -31,6 +34,7 @@ export class BreezPaywallElement extends LitElement {
  try {
  this._evtSrc?.close();
  this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
+ this._evtSrc.onopen = () => { this._rtConnected = true; this._rtAttempts =0; };
  this._evtSrc.addEventListener('payment-succeeded', (ev: MessageEvent) => {
  try {
  const data = JSON.parse(ev.data);
@@ -41,7 +45,11 @@ export class BreezPaywallElement extends LitElement {
  }
  } catch { /* ignore */ }
  });
- this._evtSrc.onerror = () => { /* keep retrying */ };
+ this._evtSrc.onerror = () => {
+ this._rtConnected = false; this._rtAttempts++;
+ const backoff = Math.min(30000,1000 * Math.pow(2, this._rtAttempts));
+ console.warn(`[paywall] realtime disconnected, attempt ${this._rtAttempts}, next retry ~${Math.round(backoff/1000)}s`);
+ };
  } catch { /* ignore */ }
  }
 
@@ -79,8 +87,13 @@ export class BreezPaywallElement extends LitElement {
  if (this._pollTimer) { clearInterval(this._pollTimer); this._pollTimer = null; }
  }
 
+ private _refreshNow = async () => {
+ await this._checkStatus();
+ if (this._status === 'paid') { this._modalOpen = false; this._stopPolling(); }
+ };
+
  private _openModal() { this._modalOpen = true; this._status = 'pending'; this._startPolling(); }
- private _closeModal = () => { this._modalOpen = false; /* keep polling while pending in background? keep for robustness */ };
+ private _closeModal = () => { this._modalOpen = false; this._stopPolling(); };
  private _onInvoiceGenerated = (_e: CustomEvent) => { this._status = 'pending'; this._startPolling(); };
 
  render() {
@@ -97,7 +110,13 @@ export class BreezPaywallElement extends LitElement {
  ${problem ? html`<div class="warning" role="status" aria-live="polite">${problem}</div>` : nothing}
  ${this._status !== 'pending'
  ? html`<button class="primary" @click=${this._openModal}>${this.buttonLabel}</button>`
- : html`<div class="pending" role="status" aria-live="polite">${this.waitingLabel}</div>`}
+ : html`
+ <div class="pending-wrap">
+ <div class="pending" role="status" aria-live="polite">${this.waitingLabel}</div>
+ <button class="refresh" @click=${this._refreshNow}>${this.refreshLabel}</button>
+ ${!this._rtConnected ? html`<div class="meta" aria-live="polite">Live updates offline, retrying… (attempt ${this._rtAttempts})</div>` : nothing}
+ </div>
+ `}
  </div>
  <breez-payment-modal
  .open=${this._modalOpen}
@@ -114,12 +133,15 @@ export class BreezPaywallElement extends LitElement {
  static styles = css`
  :host { display: block; }
  .breez-paywall { display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; }
+ .pending-wrap { display:flex; align-items:center; gap:0.5rem; flex-wrap: wrap; }
  .loading { color: var(--lp-color-text-muted); }
  .pending { color: var(--lp-color-text-muted); }
  .warning { color: #a15c00; }
  .error { color: var(--lp-color-danger); }
  .primary { background: var(--lp-color-primary); border:0; color: var(--lp-color-bg); padding:0.5rem0.9rem; border-radius: var(--lp-radius); cursor:pointer; }
  .primary:hover { background: var(--lp-color-primary-hover); }
+ .refresh { background: transparent; border: var(--lp-border); border-radius: var(--lp-radius); padding:0.3rem0.6rem; cursor: pointer; }
+ .meta { color: var(--lp-color-text-muted); font-size:0.85rem; }
  `;
 }
 
