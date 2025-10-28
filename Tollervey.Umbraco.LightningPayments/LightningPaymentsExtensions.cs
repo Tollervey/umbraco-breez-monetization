@@ -8,6 +8,7 @@ using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
 using Tollervey.Umbraco.LightningPayments.UI.Services.Realtime;
 using Tollervey.Umbraco.LightningPayments.UI.Services.RateLimiting;
+using Microsoft.Extensions.Configuration;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -35,15 +36,8 @@ namespace Microsoft.Extensions.DependencyInjection
             // Default runtime mode marker (online by default)
             builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: false));
 
-            // Add Application Insights if connection string is provided
-            var aiConnectionString = builder.Config.GetSection(LightningPaymentsSettings.SectionName)["ApplicationInsightsConnectionString"];
-            if (!string.IsNullOrEmpty(aiConnectionString))
-            {
-                builder.Services.AddApplicationInsightsTelemetry(options =>
-                {
-                    options.ConnectionString = aiConnectionString;
-                });
-            }
+            // NOTE: Application Insights is intentionally NOT registered here automatically. Consumers should opt-in by calling
+            // AddLightningPaymentsApplicationInsights on the IUmbracoBuilder if they want AI wired up for this library.
 
             // Register services
             builder.Services.AddDbContext<PaymentDbContext>((serviceProvider, options) =>
@@ -75,6 +69,32 @@ namespace Microsoft.Extensions.DependencyInjection
             // Middleware and endpoint registration moved to Composer to ensure correct Umbraco pipeline ordering.
 
             return builder;
+        }
+
+        /// <summary>
+        /// Registers Application Insights telemetry for the host when using the Lightning Payments package.
+        /// Call this from the consuming application's startup if Application Insights is desired.
+        /// </summary>
+        /// <param name="builder">The Umbraco builder.</param>
+        /// <param name="connectionString">Application Insights connection string.</param>
+        /// <returns>The same <paramref name="builder"/> for chaining.</returns>
+        public static IUmbracoBuilder AddLightningPaymentsApplicationInsights(this IUmbracoBuilder builder, string connectionString)
+        {
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                builder.Services.AddApplicationInsightsTelemetry(options => { options.ConnectionString = connectionString; });
+            }
+            return builder;
+        }
+
+        /// <summary>
+        /// Registers Application Insights telemetry using the configured value in the LightningPayments configuration section.
+        /// This is a convenience method; the consumer can also call AddLightningPaymentsApplicationInsights explicitly.
+        /// </summary>
+        public static IUmbracoBuilder AddLightningPaymentsApplicationInsightsFromConfig(this IUmbracoBuilder builder)
+        {
+            var aiConnectionString = builder.Config.GetSection(LightningPaymentsSettings.SectionName)["ApplicationInsightsConnectionString"];
+            return builder.AddLightningPaymentsApplicationInsights(aiConnectionString ?? string.Empty);
         }
 
         /// <summary>
