@@ -53,7 +53,6 @@ export class BreezPaymentModalBasic extends LitElement {
  private _rates = new CoinGeckoExchangeRateService();
  @state() private _fiatLoading = false;
  @state() private _fiatError = '';
- @state() private _fiatPrice: number | null = null;
  @state() private _fiatTotal: number | null = null;
 
  private _previouslyFocused: Element | null = null;
@@ -218,7 +217,6 @@ export class BreezPaymentModalBasic extends LitElement {
  this._fiatError = '';
  try {
  const price = await this._rates.getBtcPrice(this.currency);
- this._fiatPrice = price;
  this._fiatTotal = this._rates.toFiat(total, price);
  } catch (e: any) {
  this._fiatError = e?.message ?? 'rate failed';
@@ -304,7 +302,7 @@ export class BreezPaymentModalBasic extends LitElement {
  }
 
  private _renderFiat() {
- if this._fiatLoading) return html`<div class="fiat" role="status" aria-live="polite">${this.ratesLoadingLabel}</div>`;
+ if (this._fiatLoading) return html`<div class="fiat" role="status" aria-live="polite">${this.ratesLoadingLabel}</div>`;
  if (this._fiatError) return html`<div class="fiat error">${this.ratesErrorLabel} <button class="link" @click=${this._retryRates}>${this.ratesRetryLabel}</button></div>`;
  if (this._fiatTotal != null) {
  const code = this.currency;
