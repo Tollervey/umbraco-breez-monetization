@@ -15,7 +15,6 @@
     <PackageId>Tollervey.Umbraco.LightningPayments</PackageId>
     <Product>Tollervey.Umbraco.LightningPayments</Product>
     <Title>Tollervey.Umbraco.LightningPayments</Title>
-    <UserSecretsId>79b9c464-0997-4dd9-925e-ce1791a34324</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,11 +25,11 @@
     <PackageReference Include="Breez.Sdk.Liquid" Version="0.11.7" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" PrivateAssets="All" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" PrivateAssets="All" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
     <PackageReference Include="OpenTelemetry.Api" Version="1.13.1" />
