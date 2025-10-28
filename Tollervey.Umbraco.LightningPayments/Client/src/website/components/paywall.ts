@@ -124,6 +124,8 @@ export class BreezPaywallElement extends LitElement {
  .amount=${0}
  .title=${this.title}
  .description=${this.description}
+ .enableBolt12=${true}
+ .enableLnurl=${true}
  @close=${this._closeModal}
  @invoice-generated=${this._onInvoiceGenerated}
  ></breez-payment-modal>
