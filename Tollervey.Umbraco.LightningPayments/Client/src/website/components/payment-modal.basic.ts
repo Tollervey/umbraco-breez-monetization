@@ -35,6 +35,11 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String, attribute: 'rates-loading-label' }) ratesLoadingLabel = 'Fetching rates…';
  @property({ type: String, attribute: 'rates-error-label' }) ratesErrorLabel = 'Failed to fetch rates';
  @property({ type: String, attribute: 'rates-retry-label' }) ratesRetryLabel = 'Retry';
+ @property({ type: String, attribute: 'show-details-label' }) showDetailsLabel = 'Show details';
+ @property({ type: String, attribute: 'hide-details-label' }) hideDetailsLabel = 'Hide details';
+ @property({ type: String, attribute: 'copy-invoice-label' }) copyInvoiceLabel = 'Copy invoice';
+ @property({ type: String, attribute: 'copied-label' }) copiedLabel = 'Copied';
+ @property({ type: String, attribute: 'open-wallet-label' }) openWalletLabel = 'Open in wallet';
 
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
@@ -55,12 +60,19 @@ export class BreezPaymentModalBasic extends LitElement {
  @state() private _fiatError = '';
  @state() private _fiatTotal: number | null = null;
 
+ // details panel state
+ @state() private _detailsOpen = false;
+ @state() private _copyOk = false;
+ private _copyTimer: number | null = null;
+
  private _previouslyFocused: Element | null = null;
  private _titleId = `bpm-title-${Math.random().toString(36).slice(2)}`;
  private _descId = `bpm-desc-${Math.random().toString(36).slice(2)}`;
 
+ private _sr(): ShadowRoot | null { return (this as any).shadowRoot ?? null; }
+
  private _emitClose() {
- this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }));
+ (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }));
  }
 
  private _handleClose = () => {
@@ -81,7 +93,7 @@ export class BreezPaymentModalBasic extends LitElement {
  if (focusables.length ===0) return;
  const first = focusables[0];
  const last = focusables[focusables.length -1];
- const active = this.shadowRoot?.activeElement as HTMLElement | null ?? (document.activeElement as HTMLElement | null);
+ const active = ((this as any).shadowRoot?.activeElement as HTMLElement | null) ?? (document.activeElement as HTMLElement | null);
  if (e.shiftKey) {
  if (!active || active === first) {
  e.preventDefault();
@@ -97,7 +109,7 @@ export class BreezPaymentModalBasic extends LitElement {
  };
 
  private _getFocusable(): HTMLElement[] {
- const container = this.shadowRoot?.querySelector('.modal') as HTMLElement | null;
+ const container = this._sr()?.querySelector('.modal') as HTMLElement | null;
  if (!container) return [];
  const selectors = [
  'a[href]', 'button:not([disabled])', 'textarea:not([disabled])', 'input:not([disabled])',
@@ -109,7 +121,7 @@ export class BreezPaymentModalBasic extends LitElement {
 
  private _focusInitial() {
  // Focus the modal container or first focusable
- const modal = this.shadowRoot?.querySelector('.modal') as HTMLElement | null;
+ const modal = this._sr()?.querySelector('.modal') as HTMLElement | null;
  const focusables = this._getFocusable();
  if (focusables.length) focusables[0].focus();
  else modal?.focus();
@@ -148,7 +160,8 @@ export class BreezPaymentModalBasic extends LitElement {
  const totalSec = Math.floor(ms /1000);
  const m = Math.floor(totalSec /60);
  const s = totalSec %60;
- this._remaining = `${this.expiresInLabel} ${m}:${s.toString().padStart(2,'0')}`;
+ const s2 = s <10 ? `0${s}` : String(s);
+ this._remaining = `${this.expiresInLabel} ${m}:${s2}`;
  this._isExpired = false;
  }
 
@@ -171,6 +184,9 @@ export class BreezPaymentModalBasic extends LitElement {
  this.expiry = undefined;
  this._remaining = '';
  this._isExpired = false;
+ this._detailsOpen = false;
+ this._copyOk = false;
+ if (this._copyTimer) { clearTimeout(this._copyTimer); this._copyTimer = null; }
  }
 
  private async _regenerateInvoice() {
@@ -232,6 +248,16 @@ export class BreezPaymentModalBasic extends LitElement {
  }
 
  private _retryRates = () => this._loadFiat();
+ private _toggleDetails = () => { this._detailsOpen = !this._detailsOpen; };
+ private async _copyInvoice() {
+ if (!this._invoice?.bolt11) return;
+ try {
+ await navigator.clipboard.writeText(this._invoice.bolt11);
+ this._copyOk = true;
+ if (this._copyTimer) clearTimeout(this._copyTimer);
+ this._copyTimer = window.setTimeout(() => { this._copyOk = false; },1500);
+ } catch { /* ignore */ }
+ }
 
  async _generateInvoice() {
  if (!this.contentId || this.contentId <=0) {
@@ -247,7 +273,7 @@ export class BreezPaymentModalBasic extends LitElement {
  this._invoice = { bolt11: data.invoice, paymentHash: data.paymentHash };
  this.expiry = data.expiry ?? undefined;
  if (this.expiry) this._startCountdown();
- this.dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: data.paymentHash }, bubbles: true, composed: true }));
+ (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: data.paymentHash }, bubbles: true, composed: true }));
  } catch (err: any) {
  this._error = err?.message ?? this.createErrorLabel;
  } finally {
@@ -258,7 +284,8 @@ export class BreezPaymentModalBasic extends LitElement {
  updated(changed: Map<string, unknown>) {
  if (changed.has('open')) {
  if (this.open) {
- this._previouslyFocused = (this.getRootNode() as Document | ShadowRoot).activeElement as Element | null;
+ const root: any = (this as any).getRootNode ? (this as any).getRootNode() : document;
+ this._previouslyFocused = (root.activeElement as Element | null) ?? null;
  this._lockScroll(true);
  // Reset transient state when opening, unless a pre-supplied invoice is provided
  if (!this.invoice) {
@@ -267,13 +294,13 @@ export class BreezPaymentModalBasic extends LitElement {
  this._error = '';
  // Defer to ensure DOM is rendered
  setTimeout(() => this._focusInitial(),0);
- this.addEventListener('keydown', this._onKeyDown);
+ (this as any).addEventListener('keydown', this._onKeyDown);
  if (this.expiry) this._startCountdown();
  // Kick off best-effort fee quote for paywall flows (no pre-supplied invoice)
  if (!this.invoice) this._loadFeeQuote();
  } else {
  this._lockScroll(false);
- this.removeEventListener('keydown', this._onKeyDown);
+ (this as any).removeEventListener('keydown', this._onKeyDown);
  this._clearCountdown();
  if (this._previouslyFocused && (this._previouslyFocused as HTMLElement).focus) {
  (this._previouslyFocused as HTMLElement).focus();
@@ -284,7 +311,7 @@ export class BreezPaymentModalBasic extends LitElement {
  if (changed.has('open') || changed.has('invoice') || changed.has('paymentHash')) {
  if (this.open && this.invoice && this.paymentHash && !this._invoice) {
  this._invoice = { bolt11: this.invoice, paymentHash: this.paymentHash };
- this.dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: this.paymentHash }, bubbles: true, composed: true }));
+ (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: this.paymentHash }, bubbles: true, composed: true }));
  }
  }
 
@@ -296,9 +323,10 @@ export class BreezPaymentModalBasic extends LitElement {
  disconnectedCallback(): void {
  super.disconnectedCallback();
  // Safety: ensure no locks or listeners remain if element is removed while open
- this.removeEventListener('keydown', this._onKeyDown);
+ (this as any).removeEventListener('keydown', this._onKeyDown);
  this._clearCountdown();
  this._lockScroll(false);
+ if (this._copyTimer) { clearTimeout(this._copyTimer); this._copyTimer = null; }
  }
 
  private _renderFiat() {
@@ -310,6 +338,31 @@ export class BreezPaymentModalBasic extends LitElement {
  return html`<div class="fiat approx">? ${formatted}</div>`;
  }
  return nothing;
+ }
+
+ private _renderDetails() {
+ if (!this._invoice) return nothing;
+ const ln = this._invoice.bolt11;
+ const openHref = `lightning:${ln}`;
+ return html`
+ <div class="details">
+ <button class="link" @click=${this._toggleDetails} aria-expanded=${this._detailsOpen ? 'true' : 'false'}>
+ ${this._detailsOpen ? this.hideDetailsLabel : this.showDetailsLabel}
+ </button>
+ ${this._detailsOpen ? html`
+ <div class="grid">
+ <div><span class="k">Method</span><span class="v">${this._feeMethod ?? 'bolt11'}</span></div>
+ ${this._feeAmount != null ? html`<div><span class="k">Amount</span><span class="v">${this._feeAmount.toLocaleString()} sats</span></div>` : nothing}
+ ${this._feeSat != null ? html`<div><span class="k">Fees</span><span class="v">${this._feeSat.toLocaleString()} sats</span></div>` : nothing}
+ ${this.expiry ? html`<div><span class="k">Expiry</span><span class="v">${new Date(this.expiry).toLocaleString()}</span></div>` : nothing}
+ <div class="ln"><span class="k">Invoice</span><uui-textarea readonly .value=${ln}></uui-textarea></div>
+ <div class="actions">
+ <uui-button look="secondary" @click=${this._copyInvoice}>${this._copyOk ? this.copiedLabel : this.copyInvoiceLabel}</uui-button>
+ <a class="open-wallet" href=${openHref}>${this.openWalletLabel}</a>
+ </div>
+ </div>
+ ` : nothing}
+ </div>`;
  }
 
  private _renderFeeQuote() {
@@ -352,6 +405,7 @@ export class BreezPaymentModalBasic extends LitElement {
  <breez-qr-code-display .data=${this._invoice.bolt11}></breez-qr-code-display>
  <breez-invoice-display .invoice=${this._invoice.bolt11}></breez-invoice-display>
  ${this._remaining ? html`<div class="expiry" role="status" aria-live="polite">${this._remaining}</div>` : nothing}
+ ${this._renderDetails()}
  ${this._isExpired ? html`
  <button class="secondary" @click=${this._regenerateInvoice} ?disabled=${this._loading}>
  ${this.regenerateLabel}
@@ -384,6 +438,12 @@ export class BreezPaymentModalBasic extends LitElement {
  .fiat { margin-top:0.35rem; font-size:0.95rem; color: var(--lp-color-text-muted); }
  .fiat.error { color: var(--lp-color-danger); }
  .fiat .link { background:none; border:0; color: var(--lp-color-primary); cursor:pointer; text-decoration: underline; padding:0; }
+ .details { margin-top:0.5rem; }
+ .details .grid { display:grid; grid-template-columns:1fr1fr; gap:0.5rem1rem; align-items:start; }
+ .details .k { color: var(--lp-color-text-muted); margin-right:0.35rem; }
+ .details .ln { grid-column:1 / -1; }
+ .details .actions { display:flex; gap:0.5rem; align-items:center; margin-top:0.25rem; }
+ .open-wallet { text-decoration: none; background: var(--lp-color-primary); color: var(--lp-color-bg); padding:0.4rem0.6rem; border-radius:4px; }
  `;
 }
 
