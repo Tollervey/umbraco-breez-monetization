@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
 {
@@ -24,6 +26,11 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  /// Gets the outbound channel for SSE frames.
  /// </summary>
  public Channel<string> Outbound { get; } = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+
+ /// <summary>
+ /// Try to gracefully complete the outbound writer.
+ /// </summary>
+ public void Complete() => Outbound.Writer.TryComplete();
  }
 
  private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, SseClient>> _clientsBySession = new();
@@ -46,7 +53,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  {
  if (_clientsBySession.TryGetValue(sessionId, out var bucket))
  {
- bucket.TryRemove(clientId, out _);
+ if (bucket.TryRemove(clientId, out var client))
+ {
+ try { client?.Complete(); } catch { /* ignore */ }
+ }
  if (bucket.IsEmpty)
  {
  _clientsBySession.TryRemove(sessionId, out _);
@@ -63,7 +73,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  if (sessionId == "*") { BroadcastAll(@event, payload); return; }
  if (!_clientsBySession.TryGetValue(sessionId, out var bucket) || bucket.Count ==0) return;
  var frame = BuildFrame(@event, payload);
- foreach (var kvp in bucket) { _ = kvp.Value.Outbound.Writer.WriteAsync(frame); }
+ foreach (var kvp in bucket)
+ {
+ var client = kvp.Value;
+ // TryWrite avoids queuing to closed writers. If it fails, remove the client.
+ if (!client.Outbound.Writer.TryWrite(frame))
+ {
+ RemoveClient(sessionId, client.Id);
+ }
+ }
  }
 
  /// <summary>
@@ -72,9 +90,56 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services.Realtime
  public void BroadcastAll(string @event, object payload)
  {
  var frame = BuildFrame(@event, payload);
- foreach (var bucket in _clientsBySession.Values)
+ foreach (var session in _clientsBySession)
  {
- foreach (var kvp in bucket) { _ = kvp.Value.Outbound.Writer.WriteAsync(frame); }
+ var sessionId = session.Key;
+ var bucket = session.Value;
+ foreach (var kvp in bucket)
+ {
+ var client = kvp.Value;
+ if (!client.Outbound.Writer.TryWrite(frame))
+ {
+ RemoveClient(sessionId, client.Id);
+ }
+ }
+ }
+ }
+
+ /// <summary>
+ /// Send a lightweight SSE comment heartbeat to keep connections alive.
+ /// </summary>
+ public void SendHeartbeat(string sessionId)
+ {
+ if (!_clientsBySession.TryGetValue(sessionId, out var bucket) || bucket.Count ==0) return;
+ const string heartbeat = ":\n\n"; // SSE comment to keep connection alive
+ foreach (var kvp in bucket)
+ {
+ var client = kvp.Value;
+ if (!client.Outbound.Writer.TryWrite(heartbeat))
+ {
+ RemoveClient(sessionId, client.Id);
+ }
+ }
+ }
+
+ /// <summary>
+ /// Send heartbeat to all sessions.
+ /// </summary>
+ public void SendHeartbeatAll()
+ {
+ const string heartbeat = ":\n\n";
+ foreach (var session in _clientsBySession)
+ {
+ var sessionId = session.Key;
+ var bucket = session.Value;
+ foreach (var kvp in bucket)
+ {
+ var client = kvp.Value;
+ if (!client.Outbound.Writer.TryWrite(heartbeat))
+ {
+ RemoveClient(sessionId, client.Id);
+ }
+ }
  }
  }
 
