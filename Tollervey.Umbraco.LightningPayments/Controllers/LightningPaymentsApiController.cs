@@ -50,6 +50,21 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             _invoiceHelper = invoiceHelper;
         }
 
+        // Helper to handle idempotency header lookup and short-circuit when a previous mapping exists.
+        private async Task<(IActionResult? Result, string? IdempotencyKey)> TryGetIdempotencyMappingResultAsync()
+        {
+            var idempotencyKey = Request.Headers[LightningPaymentsSettings.IdempotencyKeyHeader].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(idempotencyKey)) return (null, null);
+
+            var existing = await _paymentStateService.TryGetMappingByKeyAsync(idempotencyKey);
+            if (existing != null)
+            {
+                return (Ok(new { invoice = existing.Invoice, paymentHash = existing.PaymentHash, status = existing.Status.ToString().ToLowerInvariant() }), idempotencyKey);
+            }
+
+            return (null, idempotencyKey);
+        }
+
         /// <summary>
         /// Gets the connection status of the Breez SDK.
         /// </summary>
@@ -99,16 +114,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             if (request == null || request.AmountSat <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid amount.");
             try
             {
-                var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
-
-                if (!string.IsNullOrWhiteSpace(idempotencyKey))
-                {
-                    var existing = await _paymentStateService.TryGetMappingByKeyAsync(idempotencyKey);
-                    if (existing != null)
-                    {
-                        return Ok(new { invoice = existing.Invoice, paymentHash = existing.PaymentHash, status = existing.Status.ToString().ToLowerInvariant() });
-                    }
-                }
+                var (preResult, idempotencyKey) = await TryGetIdempotencyMappingResultAsync();
+                if (preResult != null) return preResult;
 
                 var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(request.AmountSat, string.IsNullOrWhiteSpace(request.Description) ? "Test invoice" : request.Description!, idempotencyKey);
                 return Ok(new { invoice, paymentHash });
@@ -258,15 +265,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 _logger.LogInformation("Invoice requested for ContentId {ContentId} and Fee {Fee}", contentId, paywallConfig.Fee);
 
-                var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(idempotencyKey))
-                {
-                    var existing = await _paymentStateService.TryGetMappingByKeyAsync(idempotencyKey);
-                    if (existing != null)
-                    {
-                        return Ok(new { invoice = existing.Invoice, paymentHash = existing.PaymentHash, status = existing.Status.ToString().ToLowerInvariant() });
-                    }
-                }
+                var (preResult, idempotencyKey) = await TryGetIdempotencyMappingResultAsync();
+                if (preResult != null) return preResult;
 
                 var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(paywallConfig.Fee, $"Access to content ID {contentId}", idempotencyKey);
                 var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
@@ -343,15 +343,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 if (!paywallConfig.Enabled || paywallConfig.Fee ==0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Paywall is not enabled or fee is not set.");
                 if (sats != paywallConfig.Fee) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Amount does not match the required fee.");
 
-                var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(idempotencyKey))
-                {
-                    var existing = await _paymentStateService.TryGetMappingByKeyAsync(idempotencyKey);
-                    if (existing != null)
-                    {
-                        return Ok(new { invoice = existing.Invoice, paymentHash = existing.PaymentHash, status = existing.Status.ToString().ToLowerInvariant() });
-                    }
-                }
+                var (preResult, idempotencyKey) = await TryGetIdempotencyMappingResultAsync();
+                if (preResult != null) return preResult;
 
                 var (invoice, paymentHash) = await _invoiceHelper.CreateInvoiceAndHashAsync(sats, $"Access to {content.Name} (ID: {contentId})", idempotencyKey);
                 var sessionId = _invoiceHelper.EnsureSessionCookie(Request, Response);
