@@ -1,4 +1,3 @@
 <Solution>
-  <Project Path="../Spikes/ReplitLITGui/main.csproj" />
   <Project Path="Tollervey.Umbraco.LightningPayments/Tollervey.Umbraco.LightningPayments.UI.csproj" />
 </Solution>
