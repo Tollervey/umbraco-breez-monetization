@@ -79,6 +79,27 @@ builder.AddLightningPayments();
 // app.UseRateLimiter();
 ```
 
+Secrets & production enforcement
+
+To reduce the risk of accidentally checking secrets into source control, the library enforces a fail-fast check in Production. If secret-like settings are present in the loaded configuration (for example in `appsettings.json`) and the corresponding environment variables are not provided, startup will fail and a critical log explains which keys must be moved to a secure provider.
+
+Keys checked by the validator (examples of environment variable names):
+- `LightningPayments__BreezApiKey`
+- `LightningPayments__Mnemonic`
+- `LightningPayments__WebhookSecret`
+- `LightningPayments__SmtpPassword`
+
+Recommended ways to supply secrets
+- Development: use the .NET User Secrets store
+ - Set via CLI: `dotnet user-secrets set "LightningPayments:BreezApiKey" "your-api-key"`
+- Environment variables: provide values using the double-underscore convention (e.g., `LightningPayments__BreezApiKey`).
+- Cloud/Production: use a managed secret store (recommended)
+ - Azure Key Vault with the Key Vault configuration provider and managed identity
+ - AWS Secrets Manager or similar secret stores
+ - Configure the secret provider before `AddLightningPayments()` so values are present during options validation
+
+If you need to allow a non-standard secret provider or opt out of the enforcement for a specific environment, contact the project maintainer or add a small wrapper in your host app to configure `RateLimitingOptions`/settings as required before calling `AddLightningPayments()` (not recommended for general use).
+
 Troubleshooting
 - If enabling ASP.NET rate limiting, ensure your host application pipeline still calls `app.UseRateLimiter()` (the package composer attempts to enable it in the Umbraco pipeline).
 
