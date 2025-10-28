@@ -9,12 +9,14 @@ export class BreezPaywallElement extends LitElement {
  @property({ type: String }) title: string = 'Unlock content';
  @property({ type: String }) description: string = 'One-time Lightning payment to access this content.';
 
- // labels
+ // labels (i18n)
  @property({ type: String, attribute: 'checking-label' }) checkingLabel = 'Checking access…';
  @property({ type: String, attribute: 'waiting-label' }) waitingLabel = 'Waiting for payment confirmation…';
  @property({ type: String, attribute: 'failed-label' }) failedLabel = 'Payment failed. Please try again.';
  @property({ type: String, attribute: 'expired-label' }) expiredLabel = 'Invoice expired. Generate a new one.';
  @property({ type: String, attribute: 'refresh-label' }) refreshLabel = 'Refresh status';
+ @property({ type: String, attribute: 'invalid-content-label' }) invalidContentLabel = 'Invalid content id';
+ @property({ type: String, attribute: 'offline-hint-label' }) offlineHintLabel = 'Live updates offline, retrying…';
 
  @state() private _status: 'unknown' | 'paid' | 'pending' | 'failed' | 'expired' | 'unpaid' = 'unknown';
  @state() private _loading: boolean = true;
@@ -54,7 +56,7 @@ export class BreezPaywallElement extends LitElement {
  }
 
  private async _checkStatus() {
- if (!this.contentId || this.contentId <=0) { this._error = 'Invalid content id'; this._loading = false; return; }
+ if (!this.contentId || this.contentId <=0) { this._error = this.invalidContentLabel; this._loading = false; return; }
  this._loading = true; this._error = '';
  try {
  const res = await fetch(`/api/public/lightning/GetPaymentStatus?contentId=${this.contentId}`);
@@ -106,15 +108,15 @@ export class BreezPaywallElement extends LitElement {
  const problem = this._status === 'failed' ? this.failedLabel : this._status === 'expired' ? this.expiredLabel : '';
  return html`
  <div class="breez-paywall ${this._status}">
- ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : nothing}
+ ${this._error ? html`<div class="error" role="alert" aria-live="assertive">${this._error}</div>` : nothing}
  ${problem ? html`<div class="warning" role="status" aria-live="polite">${problem}</div>` : nothing}
  ${this._status !== 'pending'
- ? html`<button class="primary" @click=${this._openModal}>${this.buttonLabel}</button>`
+ ? html`<button class="primary" @click=${this._openModal} aria-label=${this.buttonLabel}>${this.buttonLabel}</button>`
  : html`
  <div class="pending-wrap">
  <div class="pending" role="status" aria-live="polite">${this.waitingLabel}</div>
  <button class="refresh" @click=${this._refreshNow}>${this.refreshLabel}</button>
- ${!this._rtConnected ? html`<div class="meta" aria-live="polite">Live updates offline, retrying… (attempt ${this._rtAttempts})</div>` : nothing}
+ ${!this._rtConnected ? html`<div class="meta" role="status" aria-live="polite">${this.offlineHintLabel} (attempt ${this._rtAttempts})</div>` : nothing}
  </div>
  `}
  </div>

@@ -56,6 +56,11 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String, attribute: 'bolt12-loading-label' }) bolt12LoadingLabel = 'Preparing BOLT12…';
  @property({ type: String, attribute: 'bolt12-error-label' }) bolt12ErrorLabel = 'Failed to prepare BOLT12.';
  @property({ type: String, attribute: 'back-to-invoice-label' }) backToInvoiceLabel = 'Back to invoice';
+ // New: field labels for details/fees (i18n)
+ @property({ type: String, attribute: 'method-label' }) methodLabel = 'Method';
+ @property({ type: String, attribute: 'amount-label' }) amountLabel = 'Amount';
+ @property({ type: String, attribute: 'expiry-label' }) expiryFieldLabel = 'Expiry';
+ @property({ type: String, attribute: 'invoice-label' }) invoiceFieldLabel = 'Invoice';
 
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
@@ -435,11 +440,11 @@ export class BreezPaymentModalBasic extends LitElement {
 
  private _renderFiat() {
  if (this._fiatLoading) return html`<div class="fiat" role="status" aria-live="polite">${this.ratesLoadingLabel}</div>`;
- if (this._fiatError) return html`<div class="fiat error">${this.ratesErrorLabel} <button class="link" @click=${this._retryRates}>${this.ratesRetryLabel}</button></div>`;
+ if (this._fiatError) return html`<div class="fiat error" role="alert" aria-live="assertive">${this.ratesErrorLabel} <button class="link" @click=${this._retryRates}>${this.ratesRetryLabel}</button></div>`;
  if (this._fiatTotal != null) {
  const code = this.currency;
  const formatted = new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(this._fiatTotal);
- return html`<div class="fiat approx">? ${formatted}</div>`;
+ return html`<div class="fiat approx" role="status" aria-live="polite">? ${formatted}</div>`;
  }
  return nothing;
  }
@@ -455,11 +460,11 @@ export class BreezPaymentModalBasic extends LitElement {
  </button>
  ${this._detailsOpen ? html`
  <div class="grid">
- <div><span class="k">Method</span><span class="v">${this._feeMethod ?? 'bolt11'}</span></div>
- ${this._feeAmount != null ? html`<div><span class="k">Amount</span><span class="v">${this._feeAmount.toLocaleString()} sats</span></div>` : nothing}
- ${this._feeSat != null ? html`<div><span class="k">Fees</span><span class="v">${this._feeSat.toLocaleString()} sats</span></div>` : nothing}
- ${this.expiry ? html`<div><span class="k">Expiry</span><span class="v">${new Date(this.expiry).toLocaleString()}</span></div>` : nothing}
- <div class="ln"><span class="k">Invoice</span><uui-textarea readonly .value=${ln}></uui-textarea></div>
+ <div><span class="k">${this.methodLabel}</span><span class="v">${this._feeMethod ?? 'bolt11'}</span></div>
+ ${this._feeAmount != null ? html`<div><span class="k">${this.amountLabel}</span><span class="v">${this._feeAmount.toLocaleString()} sats</span></div>` : nothing}
+ ${this._feeSat != null ? html`<div><span class="k">${this.feesLabel}</span><span class="v">${this._feeSat.toLocaleString()} sats</span></div>` : nothing}
+ ${this.expiry ? html`<div><span class="k">${this.expiryFieldLabel}</span><span class="v">${new Date(this.expiry).toLocaleString()}</span></div>` : nothing}
+ <div class="ln"><span class="k">${this.invoiceFieldLabel}</span><uui-textarea readonly .value=${ln}></uui-textarea></div>
  <div class="actions">
  <uui-button look="secondary" @click=${this._copyInvoice}>${this._copyOk ? this.copiedLabel : this.copyInvoiceLabel}</uui-button>
  <a class="open-wallet" href=${openHref}>${this.openWalletLabel}</a>
@@ -474,8 +479,8 @@ export class BreezPaymentModalBasic extends LitElement {
  <div class="alt">
  <uui-button look="secondary" @click=${this._toggleLnurl}>${this.lnurlLabel}</uui-button>
  ${this._lnurlOpen ? html`
- <div class="alt-body">
- ${this._lnurlLoading ? html`<div class="meta">${this.lnurlLoadingLabel}</div>` : this._lnurlError ? html`<div class="error" role="alert">${this._lnurlError}</div>` : this._lnurlValue ? html`
+ <div class="alt-body" role="region" aria-live="polite">
+ ${this._lnurlLoading ? html`<div class="meta" role="status" aria-live="polite">${this.lnurlLoadingLabel}</div>` : this._lnurlError ? html`<div class="error" role="alert" aria-live="assertive">${this._lnurlError}</div>` : this._lnurlValue ? html`
  <breez-qr-code-display .data=${this._lnurlValue}></breez-qr-code-display>
  <div class="mono">${this._lnurlValue}</div>
  ` : nothing}
@@ -491,8 +496,8 @@ export class BreezPaymentModalBasic extends LitElement {
  <div class="alt">
  ${!this._bolt12Open ? html`<uui-button look="secondary" @click=${this._toggleBolt12}>${this.bolt12Label}</uui-button>` : html`<uui-button look="secondary" @click=${this._toggleBolt12}>${this.backToInvoiceLabel}</uui-button>`}
  ${this._bolt12Open ? html`
- <div class="alt-body">
- ${this._bolt12Loading ? html`<div class="meta">${this.bolt12LoadingLabel}</div>` : this._bolt12Error ? html`<div class="error" role="alert">${this._bolt12Error}</div>` : this._bolt12Offer ? html`
+ <div class="alt-body" role="region" aria-live="polite">
+ ${this._bolt12Loading ? html`<div class="meta" role="status" aria-live="polite">${this.bolt12LoadingLabel}</div>` : this._bolt12Error ? html`<div class="error" role="alert" aria-live="assertive">${this._bolt12Error}</div>` : this._bolt12Offer ? html`
  <breez-qr-code-display .data=${this._bolt12Offer}></breez-qr-code-display>
  <div class="mono">${this._bolt12Offer}</div>
  ` : nothing}
@@ -507,8 +512,8 @@ export class BreezPaymentModalBasic extends LitElement {
  if (this._feeAmount != null && this._feeSat != null) {
  const total = this._feeAmount + this._feeSat;
  return html`
- <div class="fees">
- <div class="row"><span>Amount</span><span><strong>${this._feeAmount.toLocaleString()} sats</strong></span></div>
+ <div class="fees" role="region" aria-live="polite">
+ <div class="row"><span>${this.amountLabel}</span><span><strong>${this._feeAmount.toLocaleString()} sats</strong></span></div>
  <div class="row"><span>${this.feesLabel}${this._feeMethod ? html` (${this._feeMethod})` : nothing}:</span><span>${this._feeSat.toLocaleString()} sats</span></div>
  <div class="row total"><span>${this.totalLabel}</span><span><strong>${total.toLocaleString()} sats</strong></span></div>
  ${this._renderFiat()}
@@ -529,10 +534,10 @@ export class BreezPaymentModalBasic extends LitElement {
  <button class="close" @click=${this._handleClose} aria-label=${this.closeLabel}>×</button>
  </header>
  <section class="body">
- ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : nothing}
+ ${this._error ? html`<div class="error" role="alert" aria-live="assertive">${this._error}</div>` : nothing}
  ${!this._invoice
  ? html`
- ${this.description ? html`<p id=${this._descId} class="desc">${this.description}</p>` : nothing}
+ ${this.description ? html`<p id=${this._descId} class="desc" role="note">${this.description}</p>` : nothing}
  ${this._renderFeeQuote()}
  <button class="primary" @click=${this._generateInvoice} ?disabled=${this._loading} aria-busy=${this._loading ? 'true' : 'false'}>
  ${this._loading ? this.generatingLabel : this.generateLabel}
@@ -542,9 +547,9 @@ export class BreezPaymentModalBasic extends LitElement {
  <breez-qr-code-display .data=${this._invoice.bolt11}></breez-qr-code-display>
  <breez-invoice-display .invoice=${this._invoice.bolt11}></breez-invoice-display>
  ${this._weblnAvailable ? html`
- <div class="webln">
+ <div class="webln" role="region" aria-live="polite">
  <uui-button look="positive" @click=${this._payWithWebln} ?disabled=${this._weblnBusy}>${this.weblnLabel}</uui-button>
- ${this._weblnError ? html`<div class="error" role="alert">${this.weblnErrorLabel}: ${this._weblnError}</div>` : nothing}
+ ${this._weblnError ? html`<div class="error" role="alert" aria-live="assertive">${this.weblnErrorLabel}: ${this._weblnError}</div>` : nothing}
  </div>` : nothing}
  ${this._remaining ? html`<div class="expiry" role="status" aria-live="polite">${this._remaining}</div>` : nothing}
  ${this._renderAltMethods()}

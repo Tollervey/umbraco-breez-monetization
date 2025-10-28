@@ -22,6 +22,10 @@ export class BreezTipJarElement extends LitElement {
  @property({ type: String, attribute: 'thanks-label' }) thanksLabel = 'Thanks for your tip!';
  @property({ type: String, attribute: 'stats-error-label' }) statsErrorLabel = 'Failed to load stats';
  @property({ type: String, attribute: 'refresh-label' }) refreshLabel = 'Refresh status';
+ @property({ type: String, attribute: 'custom-amount-label' }) customAmountLabel = 'Custom amount';
+ @property({ type: String, attribute: 'tip-stats-label' }) tipStatsLabel = '{count} tips, {total} sats total';
+ @property({ type: String, attribute: 'pending-hint-label' }) pendingHintLabel = 'Waiting for payment confirmation…';
+ @property({ type: String, attribute: 'offline-hint-label' }) offlineHintLabel = 'Live updates offline, retrying…';
 
  @state() private _selected: number =1000;
  @state() private _loading = false;
@@ -161,20 +165,20 @@ export class BreezTipJarElement extends LitElement {
  render() {
  return html`
  <div class="tip-jar">
- <div class="row" role="group" aria-label="Tip amounts">
+ <div class="row" role="group" aria-label="${this.customAmountLabel}">
  ${this.amounts.map(a => html`
  <button class="amount-btn" @click=${() => this._selected = a} ?data-selected=${this._selected === a} aria-pressed=${this._selected === a ? 'true' : 'false'}>${a.toLocaleString()} sats</button>
  `)}
  <label class="custom-input">
- <span class="sr-only">Custom amount</span>
+ <span class="sr-only">${this.customAmountLabel}</span>
  <input type="number" min="1" step="1" .value=${this._selected} @input=${(e: any) => this._selected = Math.max(1, parseInt(e.target.value ||0))} />
  <span aria-hidden="true">sats</span>
  </label>
  </div>
- ${this._statsError ? html`<div class="stats error" role="alert">${this._statsError}</div>` : ''}
- ${this._totalSats != null && this._count != null ? html`<div class="stats" aria-live="polite">${this._count} tips, ${this._totalSats.toLocaleString()} sats total</div>` : ''}
+ ${this._statsError ? html`<div class="stats error" role="alert" aria-live="assertive">${this._statsError}</div>` : ''}
+ ${this._totalSats != null && this._count != null ? html`<div class="stats" role="status" aria-live="polite">${this.tipStatsLabel.replace('{count}', String(this._count)).replace('{total}', this._totalSats.toLocaleString())}</div>` : ''}
  ${this._thanks ? html`<div class="thanks" role="status" aria-live="polite">${this.thanksLabel} ??</div>` : ''}
- ${this._error ? html`<div class="error" role="alert">${this._error}</div>` : ''}
+ ${this._error ? html`<div class="error" role="alert" aria-live="assertive">${this._error}</div>` : ''}
  <button class="primary" @click=${this._createTip} ?disabled=${this._loading} aria-busy=${this._loading ? 'true' : 'false'}>${this._loading ? this.pleaseWaitLabel : this.tipButtonLabel}</button>
  </div>
 
@@ -184,13 +188,16 @@ export class BreezTipJarElement extends LitElement {
  .description=${this.description}
  .invoice=${this._bolt11}
  .paymentHash=${this._paymentHash}
+ .enableBolt12=${true}
+ .enableLnurl=${true}
  @close=${() => { this._modalOpen = false; this._stopPolling(); }}
  ></breez-payment-modal>
 
  ${this._bolt11 && !this._thanks ? html`
- <div class="pending-tools">
+ <div class="pending-tools" role="region" aria-live="polite">
+ <div class="meta" role="status" aria-live="polite">${this.pendingHintLabel}</div>
  <button class="refresh" @click=${this._refreshNow}>${this.refreshLabel}</button>
- ${!this._rtConnected ? html`<div class="meta" aria-live="polite">Live updates offline, retrying… (attempt ${this._rtAttempts})</div>` : ''}
+ ${!this._rtConnected ? html`<div class="meta" role="status" aria-live="polite">${this.offlineHintLabel} (attempt ${this._rtAttempts})</div>` : ''}
  </div>
  ` : ''}
  `;
