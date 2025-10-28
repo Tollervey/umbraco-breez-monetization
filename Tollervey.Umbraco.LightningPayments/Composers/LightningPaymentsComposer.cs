@@ -1,3 +1,4 @@
+using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +11,9 @@ using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
 using Tollervey.Umbraco.LightningPayments.UI.Components;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Http;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 {
@@ -26,6 +30,25 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
         {
             // Register services, options, health checks, etc.
             builder.AddLightningPayments();
+
+            // Register rate limiting policies for public endpoints (invoice generation etc.).
+            // Conservative default:5 requests per minute per IP. Consumers can override in their host app.
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode =429; // HTTP429 Too Many Requests
+
+                options.AddPolicy("InvoiceGeneration", context =>
+                {
+                    var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit =5,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit =0
+                    });
+                });
+            });
 
             // Ensure BreezSdkService is tied to Umbraco app lifecycle
             builder.Components().Append<BreezSdkComponent>();
@@ -44,6 +67,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
                         // Order matters: exception handler first to wrap paywall.
                         app.UseMiddleware<ExceptionHandlingMiddleware>();
                         app.UseMiddleware<PaywallMiddleware>();
+
+                        // Enable rate limiting middleware so actions can opt-in using [EnableRateLimiting("InvoiceGeneration")] attribute.
+                        app.UseRateLimiter();
                     },
                     // Map health checks in the Endpoints stage.
                     Endpoints = app =>

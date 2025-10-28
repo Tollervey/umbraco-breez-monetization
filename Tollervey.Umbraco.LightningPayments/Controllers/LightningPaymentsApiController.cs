@@ -11,6 +11,7 @@ using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Cms.Web.Common.Authorization;
 using Umbraco.Extensions;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
@@ -91,6 +92,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
+        [EnableRateLimiting("InvoiceGeneration")]
         public async Task<IActionResult> CreateTestInvoice([FromBody] TestInvoiceRequest request)
         {
             if (request == null || request.AmountSat <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid amount.");
@@ -233,6 +235,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
+        [EnableRateLimiting("InvoiceGeneration")]
         public async Task<IActionResult> GetPaywallInvoice([FromQuery] int contentId)
         {
             if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
@@ -304,6 +307,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
+        [EnableRateLimiting("InvoiceGeneration")]
         public async Task<IActionResult> GetLnurlInvoice([FromQuery] long amount, [FromQuery] int contentId)
         {
             if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");
@@ -331,6 +335,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiError), StatusCodes.Status500InternalServerError)]
+        [EnableRateLimiting("InvoiceGeneration")]
         public async Task<IActionResult> GetBolt12Offer([FromQuery] int contentId)
         {
             if (contentId <=0) return Error(StatusCodes.Status400BadRequest, "invalid_request", "Invalid content ID.");

@@ -9,6 +9,9 @@ using Umbraco.Cms.Web.Common.ApplicationBuilder;
 using Tollervey.Umbraco.LightningPayments.UI.Services.Realtime;
 using Tollervey.Umbraco.LightningPayments.UI.Services.RateLimiting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using System;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -32,6 +35,42 @@ namespace Microsoft.Extensions.DependencyInjection
                 .ValidateOnStart();
 
             builder.Services.AddSingleton<IValidateOptions<LightningPaymentsSettings>, LightningPaymentsSettingsValidator>();
+
+            // Bind rate limiting options (optional)
+            var rlSection = builder.Config.GetSection($"{LightningPaymentsSettings.SectionName}:RateLimiting");
+            var rlOptions = rlSection.Get<RateLimitingOptions>() ?? new RateLimitingOptions();
+            builder.Services.Configure<RateLimitingOptions>(rlSection);
+
+            // If consumer wants to use ASP.NET Core RateLimiting middleware, register it according to options
+            if (rlOptions.Enabled && rlOptions.UseAspNetRateLimiter)
+            {
+                builder.Services.AddRateLimiter(options =>
+                {
+                    options.RejectionStatusCode = rlOptions.RejectionStatusCode;
+
+                    options.AddPolicy("InvoiceGeneration", context =>
+                    {
+                        string partitionKey;
+                        if (rlOptions.PartitionByIp)
+                        {
+                            partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                        }
+                        else
+                        {
+                            // fallback partition key when not partitioning by IP
+                            partitionKey = "default";
+                        }
+
+                        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = rlOptions.PermitLimit,
+                            Window = TimeSpan.FromSeconds(Math.Max(1, rlOptions.WindowSeconds)),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = rlOptions.QueueLimit
+                        });
+                    });
+                });
+            }
 
             // Default runtime mode marker (online by default)
             builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: false));
@@ -60,7 +99,7 @@ namespace Microsoft.Extensions.DependencyInjection
             // Realtime hub (SSE)
             builder.Services.AddSingleton<SseHub>();
 
-            // Rate limiter
+            // Rate limiter (in-code, used by helper if ASP.NET Core limiter not enabled)
             builder.Services.AddSingleton<IRateLimiter, MemoryRateLimiter>();
             builder.Services.AddScoped<IInvoiceHelper, InvoiceHelper>();
 

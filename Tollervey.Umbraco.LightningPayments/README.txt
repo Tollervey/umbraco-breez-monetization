@@ -94,3 +94,56 @@ LightningPayments__Mnemonic=your-mnemonic
 LightningPayments__SmtpPassword=your-smtp-password
 
 This approach ensures that sensitive data is not hardcoded or stored in version-controlled files.
+
+== Rate limiting configuration ==
+This package exposes configurable rate limiting under the `LightningPayments:RateLimiting` section. Defaults are disabled. To enable the ASP.NET Core built-in rate limiter for invoice-generation endpoints, set `Enabled` and `UseAspNetRateLimiter` to `true` and tune limits appropriately.
+
+Example `appsettings.json` snippet:
+
+{
+ "LightningPayments": {
+ "RateLimiting": {
+ "Enabled": true,
+ "UseAspNetRateLimiter": true,
+ "PermitLimit":5,
+ "WindowSeconds":60,
+ "QueueLimit":0,
+ "RejectionStatusCode":429,
+ "PartitionByIp": true
+ }
+ }
+}
+
+Programmatic configuration (C#)
+
+If you prefer to configure rate limiting in code (for example within `Program.cs` or your application composer), configure `RateLimitingOptions` before calling `AddLightningPayments()`:
+
+// In Program.cs or your Umbraco composer registration
+var rateLimiting = new Tollervey.Umbraco.LightningPayments.UI.Configuration.RateLimitingOptions
+{
+ Enabled = true,
+ UseAspNetRateLimiter = true,
+ PermitLimit =10,
+ WindowSeconds =60,
+ QueueLimit =0,
+ RejectionStatusCode =429,
+ PartitionByIp = true
+};
+
+// register the configured options
+builder.Services.Configure<Tollervey.Umbraco.LightningPayments.UI.Configuration.RateLimitingOptions>(opts =>
+{
+ opts.Enabled = rateLimiting.Enabled;
+ opts.UseAspNetRateLimiter = rateLimiting.UseAspNetRateLimiter;
+ opts.PermitLimit = rateLimiting.PermitLimit;
+ opts.WindowSeconds = rateLimiting.WindowSeconds;
+ opts.QueueLimit = rateLimiting.QueueLimit;
+ opts.RejectionStatusCode = rateLimiting.RejectionStatusCode;
+ opts.PartitionByIp = rateLimiting.PartitionByIp;
+});
+
+// Then register the package
+builder.AddLightningPayments();
+
+// If using ASP.NET Rate Limiter, ensure middleware is enabled in your pipeline (composer attempts to enable it):
+// app.UseRateLimiter();
