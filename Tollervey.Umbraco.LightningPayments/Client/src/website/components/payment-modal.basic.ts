@@ -2,6 +2,7 @@ import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import './qr-code-display.js';
 import './invoice-display.js';
+import { CoinGeckoExchangeRateService, type FiatCode } from '../services/coingecko-exchange-rate-service.js';
 
 @customElement('breez-payment-modal')
 export class BreezPaymentModalBasic extends LitElement {
@@ -16,6 +17,8 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String }) paymentHash?: string;
  // Optional expiry ISO string from backend
  @property({ type: String }) expiry?: string;
+ // Fiat currency for approximation
+ @property({ type: String }) currency: FiatCode = 'USD';
 
  // Localizable/Configurable labels
  @property({ type: String, attribute: 'generate-label' }) generateLabel = 'Generate Invoice';
@@ -29,6 +32,9 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String, attribute: 'fees-label' }) feesLabel = 'Estimated receive fee';
  @property({ type: String, attribute: 'total-label' }) totalLabel = 'Estimated total';
  @property({ type: String, attribute: 'estimating-fees-label' }) estimatingFeesLabel = 'Estimating fees…';
+ @property({ type: String, attribute: 'rates-loading-label' }) ratesLoadingLabel = 'Fetching rates…';
+ @property({ type: String, attribute: 'rates-error-label' }) ratesErrorLabel = 'Failed to fetch rates';
+ @property({ type: String, attribute: 'rates-retry-label' }) ratesRetryLabel = 'Retry';
 
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
@@ -42,6 +48,13 @@ export class BreezPaymentModalBasic extends LitElement {
  @state() private _feeAmount: number | null = null; // amountSat echoed from API
  @state() private _feeSat: number | null = null; // feesSat from API
  @state() private _feeMethod: string | null = null; // bolt11/bolt12 indicator
+
+ // fiat conversion state
+ private _rates = new CoinGeckoExchangeRateService();
+ @state() private _fiatLoading = false;
+ @state() private _fiatError = '';
+ @state() private _fiatPrice: number | null = null;
+ @state() private _fiatTotal: number | null = null;
 
  private _previouslyFocused: Element | null = null;
  private _titleId = `bpm-title-${Math.random().toString(36).slice(2)}`;
@@ -186,8 +199,41 @@ export class BreezPaymentModalBasic extends LitElement {
  // best-effort: ignore errors for fee quote
  } finally {
  this._feeLoading = false;
+ this._updateFiatIfReady();
  }
  }
+
+ private _totalSats(): number | null {
+ if (this._feeAmount != null) {
+ const fees = this._feeSat ??0;
+ return this._feeAmount + fees;
+ }
+ return null;
+ }
+
+ private async _loadFiat() {
+ const total = this._totalSats();
+ if (total == null) { this._fiatTotal = null; return; }
+ this._fiatLoading = true;
+ this._fiatError = '';
+ try {
+ const price = await this._rates.getBtcPrice(this.currency);
+ this._fiatPrice = price;
+ this._fiatTotal = this._rates.toFiat(total, price);
+ } catch (e: any) {
+ this._fiatError = e?.message ?? 'rate failed';
+ this._fiatTotal = null;
+ } finally {
+ this._fiatLoading = false;
+ }
+ }
+
+ private _updateFiatIfReady() {
+ const total = this._totalSats();
+ if (total != null) this._loadFiat();
+ }
+
+ private _retryRates = () => this._loadFiat();
 
  async _generateInvoice() {
  if (!this.contentId || this.contentId <=0) {
@@ -243,6 +289,10 @@ export class BreezPaymentModalBasic extends LitElement {
  this.dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: this.paymentHash }, bubbles: true, composed: true }));
  }
  }
+
+ if (changed.has('currency') || changed.has('_feeAmount') || changed.has('_feeSat')) {
+ this._updateFiatIfReady();
+ }
  }
 
  disconnectedCallback(): void {
@@ -251,6 +301,17 @@ export class BreezPaymentModalBasic extends LitElement {
  this.removeEventListener('keydown', this._onKeyDown);
  this._clearCountdown();
  this._lockScroll(false);
+ }
+
+ private _renderFiat() {
+ if this._fiatLoading) return html`<div class="fiat" role="status" aria-live="polite">${this.ratesLoadingLabel}</div>`;
+ if (this._fiatError) return html`<div class="fiat error">${this.ratesErrorLabel} <button class="link" @click=${this._retryRates}>${this.ratesRetryLabel}</button></div>`;
+ if (this._fiatTotal != null) {
+ const code = this.currency;
+ const formatted = new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(this._fiatTotal);
+ return html`<div class="fiat approx">? ${formatted}</div>`;
+ }
+ return nothing;
  }
 
  private _renderFeeQuote() {
@@ -262,9 +323,10 @@ export class BreezPaymentModalBasic extends LitElement {
  <div class="row"><span>Amount</span><span><strong>${this._feeAmount.toLocaleString()} sats</strong></span></div>
  <div class="row"><span>${this.feesLabel}${this._feeMethod ? html` (${this._feeMethod})` : nothing}:</span><span>${this._feeSat.toLocaleString()} sats</span></div>
  <div class="row total"><span>${this.totalLabel}</span><span><strong>${total.toLocaleString()} sats</strong></span></div>
+ ${this._renderFiat()}
  </div>`;
  }
- return html``;
+ return html`${this._renderFiat()}`;
  }
 
  render() {
@@ -321,6 +383,9 @@ export class BreezPaymentModalBasic extends LitElement {
  .fees { border: var(--lp-border); border-radius: var(--lp-radius); padding:0.75rem; background: var(--lp-color-surface); color: var(--lp-color-text); }
  .fees .row { display:flex; justify-content:space-between; gap:0.5rem; padding:0.25rem0; }
  .fees .row.total { border-top: var(--lp-border); margin-top:0.25rem; padding-top:0.5rem; font-weight:600; }
+ .fiat { margin-top:0.35rem; font-size:0.95rem; color: var(--lp-color-text-muted); }
+ .fiat.error { color: var(--lp-color-danger); }
+ .fiat .link { background:none; border:0; color: var(--lp-color-primary); cursor:pointer; text-decoration: underline; padding:0; }
  `;
 }
 
