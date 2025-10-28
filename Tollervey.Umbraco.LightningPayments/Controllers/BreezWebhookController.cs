@@ -19,6 +19,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     [RequireHttps]
     public class BreezWebhookController : UmbracoApiControllerBase
     {
+        private const long MaxWebhookBodyBytes = 64 * 1024; // 64 KB
+
         private readonly IPaymentStateService _paymentStateService;
         private readonly ILogger<BreezWebhookController> _logger;
         private readonly LightningPaymentsSettings _settings;
@@ -42,12 +44,27 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         /// <param name="payload">The webhook payload containing payment details.</param>
         /// <returns>An OK response if payment is confirmed, or an error response.</returns>
         [HttpPost]
+        [RequestSizeLimit(MaxWebhookBodyBytes)]
         public async Task<IActionResult> HandleWebhook([FromBody] BreezWebhookPayload payload)
         {
+            // Quick reject oversized bodies even before buffering
+            if (Request.ContentLength.HasValue && Request.ContentLength.Value > MaxWebhookBodyBytes)
+            {
+                _logger.LogWarning("Breez webhook rejected: payload too large ({ContentLength} bytes)", Request.ContentLength.Value);
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, "Payload too large.");
+            }
+
             Request.EnableBuffering();
 
             // Verify webhook signature
-            if (!VerifyWebhookSignature(Request.Body, Request.Headers["X-Breez-Signature"].ToString()))
+            var signatureHeader = Request.Headers["X-Breez-Signature"].ToString();
+            if (string.IsNullOrWhiteSpace(_settings.WebhookSecret))
+            {
+                _logger.LogWarning("Breez webhook received but webhook secret is not configured. Rejecting request.");
+                return Unauthorized("Webhook secret not configured.");
+            }
+
+            if (!VerifyWebhookSignature(Request.Body, signatureHeader))
             {
                 _logger.LogWarning("Invalid webhook signature.");
                 return Unauthorized("Invalid signature.");
@@ -143,21 +160,55 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 return false;
             }
 
+            // Normalize signature: trim whitespace and remove optional 0x prefix
+            var sig = signature.Trim();
+            if (sig.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                sig = sig.Substring(2);
+            }
+
             body.Position = 0;
-            using var reader = new StreamReader(body);
+            using var reader = new StreamReader(body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
             var bodyContent = reader.ReadToEnd();
             body.Position = 0; // Reset for further reading if needed
 
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_settings.WebhookSecret));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(bodyContent));
 
-            byte[] signatureBytes;
+            byte[] signatureBytes = Array.Empty<byte>();
+
+            // Try parse as hex first
             try
             {
-                signatureBytes = Convert.FromHexString(signature);
+                // Reject odd length hex early
+                if (sig.Length % 2 == 0 && sig.Length <= 128) // limit to reasonable length
+                {
+                    signatureBytes = Convert.FromHexString(sig);
+                }
             }
             catch (FormatException)
             {
+                // fall through to try base64
+                signatureBytes = Array.Empty<byte>();
+            }
+
+            if (signatureBytes.Length == 0)
+            {
+                // Try base64
+                try
+                {
+                    signatureBytes = Convert.FromBase64String(sig);
+                }
+                catch (FormatException)
+                {
+                    return false;
+                }
+            }
+
+            // signature must be same length as hash
+            if (signatureBytes.Length != hash.Length)
+            {
+                _logger.LogWarning("Webhook signature length mismatch: expected {Expected} bytes but got {Actual} bytes.", hash.Length, signatureBytes.Length);
                 return false;
             }
 
