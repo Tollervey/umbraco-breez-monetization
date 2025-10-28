@@ -20,6 +20,11 @@ export class BreezPaymentModalBasic extends LitElement {
  // Fiat currency for approximation
  @property({ type: String }) currency: FiatCode = 'USD';
 
+ // Feature flags / optional inputs
+ @property({ type: Boolean, attribute: 'enable-lnurl' }) enableLnurl = false;
+ @property({ type: String, attribute: 'lightning-address' }) lightningAddress?: string;
+ @property({ type: Boolean, attribute: 'enable-bolt12' }) enableBolt12 = false;
+
  // Localizable/Configurable labels
  @property({ type: String, attribute: 'generate-label' }) generateLabel = 'Generate Invoice';
  @property({ type: String, attribute: 'generating-label' }) generatingLabel = 'Generating…';
@@ -42,6 +47,15 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String, attribute: 'open-wallet-label' }) openWalletLabel = 'Open in wallet';
  @property({ type: String, attribute: 'webln-label' }) weblnLabel = 'Pay with WebLN';
  @property({ type: String, attribute: 'webln-error-label' }) weblnErrorLabel = 'WebLN payment failed.';
+ @property({ type: String, attribute: 'lnurl-label' }) lnurlLabel = 'Pay via LNURL-P';
+ @property({ type: String, attribute: 'lnurl-loading-label' }) lnurlLoadingLabel = 'Preparing LNURL…';
+ @property({ type: String, attribute: 'lnurl-error-label' }) lnurlErrorLabel = 'Failed to prepare LNURL.';
+ @property({ type: String, attribute: 'lightning-address-label' }) lightningAddressLabel = 'Lightning Address';
+ @property({ type: String, attribute: 'copy-address-label' }) copyAddressLabel = 'Copy address';
+ @property({ type: String, attribute: 'bolt12-label' }) bolt12Label = 'Try BOLT12';
+ @property({ type: String, attribute: 'bolt12-loading-label' }) bolt12LoadingLabel = 'Preparing BOLT12…';
+ @property({ type: String, attribute: 'bolt12-error-label' }) bolt12ErrorLabel = 'Failed to prepare BOLT12.';
+ @property({ type: String, attribute: 'back-to-invoice-label' }) backToInvoiceLabel = 'Back to invoice';
 
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
@@ -71,6 +85,19 @@ export class BreezPaymentModalBasic extends LitElement {
  @state() private _weblnAvailable = false;
  @state() private _weblnBusy = false;
  @state() private _weblnError = '';
+
+ // LNURL state
+ @state() private _lnurlOpen = false;
+ @state() private _lnurlLoading = false;
+ @state() private _lnurlError = '';
+ @state() private _lnurlValue: string | null = null; // bech32 or fallback URL
+ @state() private _addrCopyOk = false;
+
+ // BOLT12 state
+ @state() private _bolt12Open = false;
+ @state() private _bolt12Loading = false;
+ @state() private _bolt12Error = '';
+ @state() private _bolt12Offer: string | null = null;
 
  private _previouslyFocused: Element | null = null;
  private _titleId = `bpm-title-${Math.random().toString(36).slice(2)}`;
@@ -196,6 +223,9 @@ export class BreezPaymentModalBasic extends LitElement {
  this._detailsOpen = false;
  this._copyOk = false;
  if (this._copyTimer) { clearTimeout(this._copyTimer); this._copyTimer = null; }
+ // reset alt modes
+ this._lnurlOpen = false; this._lnurlError = ''; this._lnurlValue = null; this._lnurlLoading = false;
+ this._bolt12Open = false; this._bolt12Error = ''; this._bolt12Offer = null; this._bolt12Loading = false;
  }
 
  private async _regenerateInvoice() {
@@ -267,6 +297,10 @@ export class BreezPaymentModalBasic extends LitElement {
  this._copyTimer = window.setTimeout(() => { this._copyOk = false; },1500);
  } catch { /* ignore */ }
  }
+ private async _copyAddress() {
+ if (!this.lightningAddress) return;
+ try { await navigator.clipboard.writeText(this.lightningAddress); this._addrCopyOk = true; setTimeout(() => this._addrCopyOk = false,1500); } catch {}
+ }
 
  private _checkWeblnOnOpenOrInvoice() { this._checkWebln(); }
  private _payWithWebln = async () => {
@@ -281,6 +315,48 @@ export class BreezPaymentModalBasic extends LitElement {
  this._weblnError = e?.message ?? this.weblnErrorLabel;
  } finally {
  this._weblnBusy = false;
+ }
+ };
+
+ private _toggleLnurl = async () => {
+ if (!this.enableLnurl) return;
+ this._lnurlOpen = !this._lnurlOpen;
+ if (this._lnurlOpen && !this._lnurlValue && !this._lnurlLoading) {
+ if (!this.contentId || this.contentId <=0) { this._lnurlError = this.missingContentLabel; return; }
+ this._lnurlLoading = true; this._lnurlError = '';
+ try {
+ const res = await fetch(`/api/public/lightning/GetLnurlPayInfo?contentId=${this.contentId}`);
+ if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ const data = await res.json();
+ // Prefer bech32 lnurl if present, else fall back to callback url
+ const bech32 = typeof data?.lnurl === 'string' ? data.lnurl : null;
+ const cb = typeof data?.callback === 'string' ? data.callback : null;
+ this._lnurlValue = bech32 || cb;
+ } catch (e: any) {
+ this._lnurlError = e?.message ?? this.lnurlErrorLabel;
+ } finally {
+ this._lnurlLoading = false;
+ }
+ }
+ };
+
+ private _toggleBolt12 = async () => {
+ if (!this.enableBolt12) return;
+ // toggle
+ const next = !this._bolt12Open;
+ this._bolt12Open = next;
+ if (next && !this._bolt12Offer && !this._bolt12Loading) {
+ if (!this.contentId || this.contentId <=0) { this._bolt12Error = this.missingContentLabel; return; }
+ this._bolt12Loading = true; this._bolt12Error = '';
+ try {
+ const res = await fetch(`/api/public/lightning/GetBolt12Offer?contentId=${this.contentId}`);
+ if (!res.ok) throw new Error(`HTTP ${res.status}`);
+ const offer = await res.text();
+ this._bolt12Offer = offer?.trim() || null;
+ } catch (e: any) {
+ this._bolt12Error = e?.message ?? this.bolt12ErrorLabel;
+ this._bolt12Open = false;
+ } finally { this._bolt12Loading = false; }
  }
  };
 
@@ -393,6 +469,39 @@ export class BreezPaymentModalBasic extends LitElement {
  </div>`;
  }
 
+ private _renderAltMethods() {
+ const lnurlSection = this.enableLnurl ? html`
+ <div class="alt">
+ <uui-button look="secondary" @click=${this._toggleLnurl}>${this.lnurlLabel}</uui-button>
+ ${this._lnurlOpen ? html`
+ <div class="alt-body">
+ ${this._lnurlLoading ? html`<div class="meta">${this.lnurlLoadingLabel}</div>` : this._lnurlError ? html`<div class="error" role="alert">${this._lnurlError}</div>` : this._lnurlValue ? html`
+ <breez-qr-code-display .data=${this._lnurlValue}></breez-qr-code-display>
+ <div class="mono">${this._lnurlValue}</div>
+ ` : nothing}
+ ${this.lightningAddress ? html`
+ <div class="addr">
+ <div class="addr-row"><span class="k">${this.lightningAddressLabel}</span><span class="v">${this.lightningAddress}</span></div>
+ <uui-button look="secondary" @click=${this._copyAddress}>${this._addrCopyOk ? this.copiedLabel : this.copyAddressLabel}</uui-button>
+ </div>` : nothing}
+ </div>` : nothing}
+ </div>` : nothing;
+
+ const bolt12Section = this.enableBolt12 ? html`
+ <div class="alt">
+ ${!this._bolt12Open ? html`<uui-button look="secondary" @click=${this._toggleBolt12}>${this.bolt12Label}</uui-button>` : html`<uui-button look="secondary" @click=${this._toggleBolt12}>${this.backToInvoiceLabel}</uui-button>`}
+ ${this._bolt12Open ? html`
+ <div class="alt-body">
+ ${this._bolt12Loading ? html`<div class="meta">${this.bolt12LoadingLabel}</div>` : this._bolt12Error ? html`<div class="error" role="alert">${this._bolt12Error}</div>` : this._bolt12Offer ? html`
+ <breez-qr-code-display .data=${this._bolt12Offer}></breez-qr-code-display>
+ <div class="mono">${this._bolt12Offer}</div>
+ ` : nothing}
+ </div>` : nothing}
+ </div>` : nothing;
+
+ return html`<div class="alts">${lnurlSection}${bolt12Section}</div>`;
+ }
+
  private _renderFeeQuote() {
  if (this._feeLoading) return html`<div class="fees" role="status" aria-live="polite">${this.estimatingFeesLabel}</div>`;
  if (this._feeAmount != null && this._feeSat != null) {
@@ -438,6 +547,7 @@ export class BreezPaymentModalBasic extends LitElement {
  ${this._weblnError ? html`<div class="error" role="alert">${this.weblnErrorLabel}: ${this._weblnError}</div>` : nothing}
  </div>` : nothing}
  ${this._remaining ? html`<div class="expiry" role="status" aria-live="polite">${this._remaining}</div>` : nothing}
+ ${this._renderAltMethods()}
  ${this._renderDetails()}
  ${this._isExpired ? html`
  <button class="secondary" @click=${this._regenerateInvoice} ?disabled=${this._loading}>
@@ -478,6 +588,12 @@ export class BreezPaymentModalBasic extends LitElement {
  .details .actions { display:flex; gap:0.5rem; align-items:center; margin-top:0.25rem; }
  .open-wallet { text-decoration: none; background: var(--lp-color-primary); color: var(--lp-color-bg); padding:0.4rem0.6rem; border-radius:4px; }
  .webln { display:flex; align-items:center; gap:0.5rem; }
+ .alts { display:flex; flex-direction:column; gap:0.5rem; }
+ .alt { display:flex; flex-direction:column; gap:0.35rem; }
+ .alt-body { display:flex; flex-direction:column; gap:0.35rem; }
+ .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: nowrap; overflow:auto; }
+ .addr { display:flex; flex-direction:column; gap:0.35rem; }
+ .addr-row { display:flex; gap:0.5rem; align-items:center; color: var(--lp-color-text-muted); }
  `;
 }
 
