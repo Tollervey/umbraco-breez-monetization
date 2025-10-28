@@ -69,6 +69,8 @@
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
     <!-- .NET analyzers for improved code quality; keep as private assets so consumers don't get them transitively -->
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="7.0.0" PrivateAssets="All" />
+    <!-- Nerdbank.GitVersioning to support Git-based versioning (private asset) -->
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.5.109" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
