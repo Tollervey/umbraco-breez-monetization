@@ -40,6 +40,8 @@ export class BreezPaymentModalBasic extends LitElement {
  @property({ type: String, attribute: 'copy-invoice-label' }) copyInvoiceLabel = 'Copy invoice';
  @property({ type: String, attribute: 'copied-label' }) copiedLabel = 'Copied';
  @property({ type: String, attribute: 'open-wallet-label' }) openWalletLabel = 'Open in wallet';
+ @property({ type: String, attribute: 'webln-label' }) weblnLabel = 'Pay with WebLN';
+ @property({ type: String, attribute: 'webln-error-label' }) weblnErrorLabel = 'WebLN payment failed.';
 
  @state() private _invoice?: { bolt11: string; paymentHash: string };
  @state() private _loading = false;
@@ -65,6 +67,11 @@ export class BreezPaymentModalBasic extends LitElement {
  @state() private _copyOk = false;
  private _copyTimer: number | null = null;
 
+ // WebLN state
+ @state() private _weblnAvailable = false;
+ @state() private _weblnBusy = false;
+ @state() private _weblnError = '';
+
  private _previouslyFocused: Element | null = null;
  private _titleId = `bpm-title-${Math.random().toString(36).slice(2)}`;
  private _descId = `bpm-desc-${Math.random().toString(36).slice(2)}`;
@@ -79,6 +86,8 @@ export class BreezPaymentModalBasic extends LitElement {
  this.open = false;
  this._emitClose();
  };
+
+ private _checkWebln() { this._weblnAvailable = !!(window as any)?.webln; }
 
  private _onKeyDown = (e: KeyboardEvent) => {
  if (!this.open) return;
@@ -259,6 +268,22 @@ export class BreezPaymentModalBasic extends LitElement {
  } catch { /* ignore */ }
  }
 
+ private _checkWeblnOnOpenOrInvoice() { this._checkWebln(); }
+ private _payWithWebln = async () => {
+ const inv = this._invoice?.bolt11;
+ const webln: any = (window as any).webln;
+ if (!inv || !webln) return;
+ this._weblnBusy = true; this._weblnError = '';
+ try {
+ if (typeof webln.enable === 'function') { await webln.enable(); }
+ await webln.sendPayment(inv);
+ } catch (e: any) {
+ this._weblnError = e?.message ?? this.weblnErrorLabel;
+ } finally {
+ this._weblnBusy = false;
+ }
+ };
+
  async _generateInvoice() {
  if (!this.contentId || this.contentId <=0) {
  this._error = this.missingContentLabel;
@@ -274,6 +299,7 @@ export class BreezPaymentModalBasic extends LitElement {
  this.expiry = data.expiry ?? undefined;
  if (this.expiry) this._startCountdown();
  (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: data.paymentHash }, bubbles: true, composed: true }));
+ this._checkWeblnOnOpenOrInvoice();
  } catch (err: any) {
  this._error = err?.message ?? this.createErrorLabel;
  } finally {
@@ -298,6 +324,7 @@ export class BreezPaymentModalBasic extends LitElement {
  if (this.expiry) this._startCountdown();
  // Kick off best-effort fee quote for paywall flows (no pre-supplied invoice)
  if (!this.invoice) this._loadFeeQuote();
+ this._checkWebln();
  } else {
  this._lockScroll(false);
  (this as any).removeEventListener('keydown', this._onKeyDown);
@@ -312,6 +339,7 @@ export class BreezPaymentModalBasic extends LitElement {
  if (this.open && this.invoice && this.paymentHash && !this._invoice) {
  this._invoice = { bolt11: this.invoice, paymentHash: this.paymentHash };
  (this as unknown as HTMLElement).dispatchEvent(new CustomEvent('invoice-generated', { detail: { paymentHash: this.paymentHash }, bubbles: true, composed: true }));
+ this._checkWeblnOnOpenOrInvoice();
  }
  }
 
@@ -404,6 +432,11 @@ export class BreezPaymentModalBasic extends LitElement {
  : html`
  <breez-qr-code-display .data=${this._invoice.bolt11}></breez-qr-code-display>
  <breez-invoice-display .invoice=${this._invoice.bolt11}></breez-invoice-display>
+ ${this._weblnAvailable ? html`
+ <div class="webln">
+ <uui-button look="positive" @click=${this._payWithWebln} ?disabled=${this._weblnBusy}>${this.weblnLabel}</uui-button>
+ ${this._weblnError ? html`<div class="error" role="alert">${this.weblnErrorLabel}: ${this._weblnError}</div>` : nothing}
+ </div>` : nothing}
  ${this._remaining ? html`<div class="expiry" role="status" aria-live="polite">${this._remaining}</div>` : nothing}
  ${this._renderDetails()}
  ${this._isExpired ? html`
@@ -444,6 +477,7 @@ export class BreezPaymentModalBasic extends LitElement {
  .details .ln { grid-column:1 / -1; }
  .details .actions { display:flex; gap:0.5rem; align-items:center; margin-top:0.25rem; }
  .open-wallet { text-decoration: none; background: var(--lp-color-primary); color: var(--lp-color-bg); padding:0.4rem0.6rem; border-radius:4px; }
+ .webln { display:flex; align-items:center; gap:0.5rem; }
  `;
 }
 
