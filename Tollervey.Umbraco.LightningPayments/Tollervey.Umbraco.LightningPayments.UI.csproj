@@ -10,6 +10,10 @@
     <!-- Suppress missing XML docs warnings to keep builds clean while shipping docs -->
     <NoWarn>$(NoWarn);1591</NoWarn>
     <BuildClientOnPack>true</BuildClientOnPack>
+
+    <!-- Enable .NET analyzers and use the latest analysis level. Do not treat warnings as errors here to avoid breaking consumers; CI can enable that. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -59,6 +63,8 @@
     <PackageReference Include="MailKit" Version="4.11.0" />
     <!-- SourceLink for GitHub (private so it doesn't flow to consumers) -->
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <!-- .NET analyzers for improved code quality; keep as private assets so consumers don't get them transitively -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="7.0.0" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
