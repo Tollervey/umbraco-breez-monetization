@@ -40,10 +40,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             message.Body = new TextPart("plain") { Text = body };
 
             using var client = _clientFactory();
-            await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, SecureSocketOptions.StartTls);
-            await client.AuthenticateAsync(_settings.SmtpUsername, _settings.SmtpPassword);
-            await client.SendAsync(message);
-            await client.DisconnectAsync(true);
+            try
+            {
+                await client.ConnectAsync(_settings.SmtpHost, _settings.SmtpPort, SecureSocketOptions.StartTls);
+                await client.AuthenticateAsync(_settings.SmtpUsername, _settings.SmtpPassword);
+                await client.SendAsync(message);
+            }
+            finally
+            {
+                try { await client.DisconnectAsync(true); } catch { /* swallow disconnect errors */ }
+                (client as IDisposable)?.Dispose();
+            }
         }
     }
 }

@@ -558,7 +558,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                 throw new InvalidInvoiceRequestException($"Invoice description length exceeds maximum of {_settings.MaxInvoiceDescriptionLength}.");
             }
 
-            if (!Regex.IsMatch(description, @"^[\w\s.,'?!@#$%^&*()_+-=\[\]{}|;:]*$"))
+            if (!LightningPaymentsSettings.DescriptionAllowed.IsMatch(description))
             {
                 _logger.LogWarning("Invoice description contains invalid characters.");
                 throw new InvalidInvoiceRequestException("Invoice description contains invalid characters.");

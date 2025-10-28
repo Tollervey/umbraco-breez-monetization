@@ -22,7 +22,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly CancellationTokenSource _cts = new();
 
-        private static readonly Regex DescriptionAllowed = new(@"^[\w\s.,'?!@#$%^&*()_+\-_\=\[\]{}|;:]*$", RegexOptions.Compiled);
+        // Use the centralized regex from settings to keep validation consistent
+        private static readonly Regex DescriptionAllowed = LightningPaymentsSettings.DescriptionAllowed;
 
         public OfflineBreezSdkService(
             IOptions<LightningPaymentsSettings> settings,

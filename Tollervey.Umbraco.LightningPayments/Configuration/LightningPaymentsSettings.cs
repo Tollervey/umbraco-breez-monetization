@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
@@ -11,6 +12,17 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         public enum LightningNetwork { Mainnet, Testnet, Regtest }
 
         public const string SectionName = "LightningPayments";
+
+        // Shared constants for headers, defaults and cookie names used across the library.
+        public const string IdempotencyKeyHeader = "Idempotency-Key";
+        public const string BreezSignatureHeader = "X-Breez-Signature";
+        public const string DefaultConnectionString = "Data Source=payment.db";
+        public const string DefaultHealthPath = "/health/ready";
+        public const string PaywallCookieName = "LightningPaymentsSession";
+        public const long MaxWebhookBodyBytes =64 *1024;
+
+        // Central invoice description validation regex (shared so both offline and live path use same rules)
+        public static readonly Regex DescriptionAllowed = new(@"^[\w\s.,'?!@#$%^&*()_+\-\=\[\]{}|;:]*$", RegexOptions.Compiled);
 
         /// <summary>
         /// The API key for Breez SDK.
@@ -37,7 +49,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// </summary>
         [Required]
         [MinLength(1)]
-        public string ConnectionString { get; init; } = "Data Source=payment.db";
+        public string ConnectionString { get; init; } = DefaultConnectionString;
 
         /// <summary>
         /// The URL for the paywall page.
@@ -75,8 +87,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// The SMTP port for sending emails.
         /// </summary>
         [Required]
-        [Range(1, 65535)]
-        public int SmtpPort { get; init; } = 587;
+        [Range(1,65535)]
+        public int SmtpPort { get; init; } =587;
 
         /// <summary>
         /// The SMTP username for authentication.
@@ -104,13 +116,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// The maximum invoice amount in satoshis.
         /// </summary>
         [Range(1, ulong.MaxValue)]
-        public ulong MaxInvoiceAmountSat { get; init; } = 10_000_000;
+        public ulong MaxInvoiceAmountSat { get; init; } =10_000_000;
 
         /// <summary>
         /// The maximum length of the invoice description.
         /// </summary>
-        [Range(1, 1024)]
-        public int MaxInvoiceDescriptionLength { get; init; } = 200;
+        [Range(1,1024)]
+        public int MaxInvoiceDescriptionLength { get; init; } =200;
 
         /// <summary>
         /// Session cookie SameSite mode. Defaults to Strict to prevent cross-site sends.
@@ -129,7 +141,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         /// Can be overridden by consumers via configuration.
         /// </summary>
         [MinLength(1)]
-        public string HealthCheckPath { get; init; } = "/health/ready";
+        public string HealthCheckPath { get; init; } = DefaultHealthPath;
 
         /// <summary>
         /// Optional working directory for the Breez SDK. If not set, defaults to '<content-root>/App_Data/LightningPayments/'.

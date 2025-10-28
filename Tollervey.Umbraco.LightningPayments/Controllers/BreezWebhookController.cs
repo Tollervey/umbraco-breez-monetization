@@ -19,7 +19,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     [RequireHttps]
     public class BreezWebhookController : UmbracoApiControllerBase
     {
-        private const long MaxWebhookBodyBytes = 64 * 1024; // 64 KB
+        private const long MaxWebhookBodyBytes = LightningPaymentsSettings.MaxWebhookBodyBytes; // 64 KB
 
         private readonly IPaymentStateService _paymentStateService;
         private readonly ILogger<BreezWebhookController> _logger;
@@ -57,14 +57,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             Request.EnableBuffering();
 
             // Verify webhook signature
-            var signatureHeader = Request.Headers["X-Breez-Signature"].ToString();
+            var signatureHeader = Request.Headers[LightningPaymentsSettings.BreezSignatureHeader].ToString();
             if (string.IsNullOrWhiteSpace(_settings.WebhookSecret))
             {
                 _logger.LogWarning("Breez webhook received but webhook secret is not configured. Rejecting request.");
                 return Unauthorized("Webhook secret not configured.");
             }
 
-            if (!VerifyWebhookSignature(Request.Body, signatureHeader))
+            if (!await VerifyWebhookSignatureAsync(Request.Body, signatureHeader))
             {
                 _logger.LogWarning("Invalid webhook signature.");
                 return Unauthorized("Invalid signature.");
@@ -153,7 +153,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             }
         }
 
-        private bool VerifyWebhookSignature(Stream body, string signature)
+        private async Task<bool> VerifyWebhookSignatureAsync(Stream body, string signature)
         {
             if (string.IsNullOrEmpty(_settings.WebhookSecret) || string.IsNullOrEmpty(signature))
             {
@@ -169,7 +169,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 
             body.Position = 0;
             using var reader = new StreamReader(body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
-            var bodyContent = reader.ReadToEnd();
+            var bodyContent = await reader.ReadToEndAsync();
             body.Position = 0; // Reset for further reading if needed
 
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_settings.WebhookSecret));
