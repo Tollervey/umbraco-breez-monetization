@@ -19,7 +19,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// Confirms a payment asynchronously.
         /// </summary>
         /// <param name="paymentHash">The unique hash of the payment.</param>
-        /// <returns>True if confirmed, false otherwise.</returns>
+        /// <returns>A <see cref="PaymentConfirmationResult"/> describing the outcome.</returns>
         Task<PaymentConfirmationResult> ConfirmPaymentAsync(string paymentHash);
 
         /// <summary>
@@ -77,10 +77,22 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         Task<PaymentState?> GetByPaymentHashAsync(string paymentHash);
     }
 
+    /// <summary>
+    /// Result of attempting to confirm a payment.
+    /// </summary>
     public enum PaymentConfirmationResult
     {
+        /// <summary>
+        /// The payment moved from Pending to Paid.
+        /// </summary>
         Confirmed,
+        /// <summary>
+        /// The payment was already confirmed earlier.
+        /// </summary>
         AlreadyConfirmed,
+        /// <summary>
+        /// No confirmable record was found.
+        /// </summary>
         NotFound
     }
 }

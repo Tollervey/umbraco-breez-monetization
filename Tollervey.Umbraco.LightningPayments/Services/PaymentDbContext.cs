@@ -3,12 +3,22 @@ using Tollervey.Umbraco.LightningPayments.UI.Models;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
+    /// <summary>
+    /// EF Core database context for persisting payment state.
+    /// </summary>
     public class PaymentDbContext : DbContext
     {
+        /// <summary>
+        /// Initializes a new instance of <see cref="PaymentDbContext"/> with the given options.
+        /// </summary>
         public PaymentDbContext(DbContextOptions<PaymentDbContext> options) : base(options) { }
 
+        /// <summary>
+        /// Payment states tracked by the system, keyed by <see cref="PaymentState.PaymentHash"/>.
+        /// </summary>
         public DbSet<PaymentState> PaymentStates { get; set; }
 
+        /// <inheritdoc />
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<PaymentState>()

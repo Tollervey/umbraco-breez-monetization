@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
 {
+    /// <summary>
+    /// Options controlling behavior when running in offline (mocked) mode.
+    /// </summary>
     public class OfflineLightningPaymentsOptions
     {
         /// <summary>

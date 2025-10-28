@@ -11,6 +11,9 @@ using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
+    /// <summary>
+    /// Receives webhook callbacks from Breez to update local payment state.
+    /// </summary>
     [ApiController]
     [Route("umbraco/api/[controller]")]
     [RequireHttps]

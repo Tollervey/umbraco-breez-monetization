@@ -2,14 +2,20 @@ using System.Text.Json.Serialization;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Models
 {
-
-    // NOTE: This is a simplified model. The actual Breez webhook payload may be more complex.
-    // Refer to the official Breez SDK documentation for the exact structure.
+    /// <summary>
+    /// Simplified Breez webhook payload carrying event type and payment details.
+    /// </summary>
     public class BreezWebhookPayload
     {
+        /// <summary>
+        /// The type of webhook event (e.g., payment_succeeded, payment_failed).
+        /// </summary>
         [JsonPropertyName("type")]
         public string Type { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Minimal payment details, including the payment id/hash.
+        /// </summary>
         [JsonPropertyName("payment")]
         public PaymentDetails? Payment { get; set; }
     }

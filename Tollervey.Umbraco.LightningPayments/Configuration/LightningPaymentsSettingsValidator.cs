@@ -4,15 +4,22 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
 {
+    /// <summary>
+    /// Validates <see cref="LightningPaymentsSettings"/> using data annotations at startup.
+    /// </summary>
     public class LightningPaymentsSettingsValidator : IValidateOptions<LightningPaymentsSettings>
     {
         private readonly ILogger<LightningPaymentsSettingsValidator> _logger;
 
+        /// <summary>
+        /// Creates a new validator instance.
+        /// </summary>
         public LightningPaymentsSettingsValidator(ILogger<LightningPaymentsSettingsValidator> logger)
         {
             _logger = logger;
         }
 
+        /// <inheritdoc />
         public ValidateOptionsResult Validate(string? name, LightningPaymentsSettings options)
         {
             var validationResults = new List<ValidationResult>();

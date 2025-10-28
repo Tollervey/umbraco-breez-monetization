@@ -6,17 +6,31 @@ using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
+    /// <summary>
+    /// SMTP-based implementation of <see cref="IEmailService"/> using MailKit.
+    /// </summary>
     public class SmtpEmailService : IEmailService
     {
         private readonly LightningPaymentsSettings _settings;
         private readonly Func<ISmtpClient> _clientFactory;
 
+        /// <summary>
+        /// Creates a new instance of <see cref="SmtpEmailService"/>.
+        /// </summary>
+        /// <param name="settings">Lightning Payments settings (SMTP config).</param>
+        /// <param name="clientFactory">Optional factory for creating <see cref="ISmtpClient"/> (useful for tests).</param>
         public SmtpEmailService(IOptions<LightningPaymentsSettings> settings, Func<ISmtpClient> clientFactory = null)
         {
             _settings = settings.Value;
             _clientFactory = clientFactory ?? (() => new SmtpClient());
         }
 
+        /// <summary>
+        /// Sends a plain-text email message.
+        /// </summary>
+        /// <param name="to">Recipient email address.</param>
+        /// <param name="subject">Email subject.</param>
+        /// <param name="body">Plain-text body.</param>
         public async Task SendEmailAsync(string to, string subject, string body)
         {
             var message = new MimeMessage();

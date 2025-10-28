@@ -3,11 +3,15 @@ using Tollervey.Umbraco.LightningPayments.UI.Models;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
+    /// <summary>
+    /// In-memory implementation of <see cref="IPaymentStateService"/> for development and testing.
+    /// </summary>
     public class InMemoryPaymentStateService : IPaymentStateService
     {
         private readonly ConcurrentDictionary<string, PaymentState> _paymentStatesByHash = new();
         private readonly ConcurrentDictionary<string, string> _paymentHashBySession = new();
 
+        /// <inheritdoc />
         public Task AddPendingPaymentAsync(string paymentHash, int contentId, string userSessionId)
         {
             try
@@ -35,6 +39,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task SetPaymentMetadataAsync(string paymentHash, ulong amountSat, PaymentKind kind)
         {
             if (_paymentStatesByHash.TryGetValue(paymentHash, out var state))
@@ -45,6 +50,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             return Task.CompletedTask;
         }
 
+        /// <inheritdoc />
         public Task<PaymentConfirmationResult> ConfirmPaymentAsync(string paymentHash)
         {
             try
@@ -67,6 +73,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task<PaymentState?> GetPaymentStateAsync(string userSessionId, int contentId)
         {
             try
@@ -88,11 +95,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task<IEnumerable<PaymentState>> GetAllPaymentsAsync()
         {
             return Task.FromResult(_paymentStatesByHash.Values.AsEnumerable());
         }
 
+        /// <inheritdoc />
         public Task<bool> MarkAsFailedAsync(string paymentHash)
         {
             try
@@ -110,6 +119,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task<bool> MarkAsExpiredAsync(string paymentHash)
         {
             try
@@ -127,6 +137,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task<bool> MarkAsRefundPendingAsync(string paymentHash)
         {
             try
@@ -144,6 +155,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task<bool> MarkAsRefundedAsync(string paymentHash)
         {
             try
@@ -161,6 +173,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             }
         }
 
+        /// <inheritdoc />
         public Task<PaymentState?> GetByPaymentHashAsync(string paymentHash)
         {
             _paymentStatesByHash.TryGetValue(paymentHash, out var state);

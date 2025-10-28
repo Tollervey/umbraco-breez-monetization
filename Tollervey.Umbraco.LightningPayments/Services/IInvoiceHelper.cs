@@ -14,13 +14,41 @@ using Umbraco.Extensions;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
+ /// <summary>
+ /// Helper for common invoice-related flows including LNURL-P responses, session cookie management,
+ /// and extracting metadata such as payment hash or expiry from invoices.
+ /// </summary>
  public interface IInvoiceHelper
  {
+ /// <summary>
+ /// Loads the published content and deserializes the paywall configuration for the given content id.
+ /// </summary>
  (IPublishedContent? Content, PaywallConfig? Config) GetContentAndPaywallConfig(int contentId);
+
+ /// <summary>
+ /// Attempts to extract the Lightning payment hash from a BOLT11 invoice. Supports offline mode fallback.
+ /// </summary>
  Task<string?> TryGetPaymentHashAsync(string invoice);
+
+ /// <summary>
+ /// Creates a new invoice and returns both the invoice string and extracted payment hash.
+ /// Throws when the hash cannot be obtained.
+ /// </summary>
  Task<(string invoice, string paymentHash)> CreateInvoiceAndHashAsync(ulong amountSat, string description);
+
+ /// <summary>
+ /// Ensures the session cookie used for paywall state exists, returning its value.
+ /// </summary>
  string EnsureSessionCookie(HttpRequest request, HttpResponse response, string? explicitState = null);
+
+ /// <summary>
+ /// Builds a standard LNURL-Pay info response for the specified content id.
+ /// </summary>
  IActionResult BuildLnurlPayInfo(int contentId, HttpRequest request, string callbackPath, ILogger logger);
+
+ /// <summary>
+ /// Attempts to extract the expiry timestamp (UTC) of an invoice, if present.
+ /// </summary>
  Task<DateTimeOffset?> TryGetInvoiceExpiryAsync(string invoice, CancellationToken ct = default);
  }
 

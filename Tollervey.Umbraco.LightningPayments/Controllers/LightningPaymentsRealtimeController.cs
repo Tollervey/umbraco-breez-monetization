@@ -6,6 +6,9 @@ using Tollervey.Umbraco.LightningPayments.UI.Services.Realtime;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
+ /// <summary>
+ /// Server-Sent Events (SSE) endpoint for real-time payment updates to the front end.
+ /// </summary>
  [ApiController]
  [Route("api/public/lightning/realtime")] 
  [RequireHttps]
@@ -20,6 +23,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
  _hub = hub;
  }
 
+ /// <summary>
+ /// Subscribes the current session to receive real-time events via SSE.
+ /// </summary>
  [HttpGet("subscribe")] // GET /api/public/lightning/realtime/subscribe
  public async Task Subscribe()
  {

@@ -14,8 +14,14 @@ using Tollervey.Umbraco.LightningPayments.UI.Components;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 {
+    /// <summary>
+    /// Umbraco composer that wires up Lightning Payments services, middleware, and optional Swagger.
+    /// </summary>
     public class LightningPaymentsComposer : IComposer
     {
+        /// <summary>
+        /// Registers services and configures the Umbraco pipeline for Lightning Payments.
+        /// </summary>
         public void Compose(IUmbracoBuilder builder)
         {
             // Register services, options, health checks, etc.

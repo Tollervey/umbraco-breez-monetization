@@ -11,8 +11,17 @@ using Tollervey.Umbraco.LightningPayments.UI.Services.RateLimiting;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
+    /// <summary>
+    /// Extension methods to register Lightning Payments services and related features with Umbraco.
+    /// </summary>
     public static class LightningPaymentsExtensions
     {
+        /// <summary>
+        /// Adds Lightning Payments services, options, health checks, and infrastructure to the Umbraco builder.
+        /// Call this in a composer during startup.
+        /// </summary>
+        /// <param name="builder">The Umbraco builder.</param>
+        /// <returns>The same <paramref name="builder"/> for chaining.</returns>
         public static IUmbracoBuilder AddLightningPayments(this IUmbracoBuilder builder)
         {
             // Bind the "LightningPayments" section of appsettings to the settings model
@@ -69,9 +78,12 @@ namespace Microsoft.Extensions.DependencyInjection
         }
 
         /// <summary>
-        /// Enables offline mode: no calls to Breez SDK are made. 
-        /// A mocked service returns synthetic invoices and simulates confirmations.
+        /// Enables offline mode where no calls to Breez SDK are made and a mocked service simulates invoices and confirmations.
+        /// Useful for development or demos without network access.
         /// </summary>
+        /// <param name="builder">The Umbraco builder.</param>
+        /// <param name="configure">Optional configuration for offline behavior.</param>
+        /// <returns>The same <paramref name="builder"/> for chaining.</returns>
         public static IUmbracoBuilder UseLightningPaymentsOffline(this IUmbracoBuilder builder, Action<OfflineLightningPaymentsOptions>? configure = null)
         {
             var options = new OfflineLightningPaymentsOptions();

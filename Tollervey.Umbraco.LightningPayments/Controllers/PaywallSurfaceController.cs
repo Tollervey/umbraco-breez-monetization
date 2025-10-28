@@ -12,6 +12,9 @@ using Umbraco.Extensions;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
+    /// <summary>
+    /// Surface controller that renders the paywall page for locked content.
+    /// </summary>
     [RequireHttps]
     public class PaywallSurfaceController : SurfaceController
     {
