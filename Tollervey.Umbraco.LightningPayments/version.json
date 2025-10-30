@@ -1,0 +1,4 @@
+{
+ "version": "1.0-preview",
+ "publicReleaseRefSpec": [ "refs/heads/main", "refs/heads/release/*" ]
+}
