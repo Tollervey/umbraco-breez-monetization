@@ -12,7 +12,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using System;
-using System.ComponentModel;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -110,9 +109,7 @@ namespace Microsoft.Extensions.DependencyInjection
             return builder.AddLightningPaymentsApplicationInsights(aiConnectionString ?? string.Empty);
         }
 
-        // Hide offline mode (still present for dev-internal use, but discouraged for consumers)
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        [Obsolete("Offline mode is not exposed in this release.", error: false)]
+        // Publicly exposed: enable offline mode for development/testing.
         public static IUmbracoBuilder UseLightningPaymentsOffline(this IUmbracoBuilder builder, Action<OfflineLightningPaymentsOptions>? configure = null)
         {
             var options = new OfflineLightningPaymentsOptions();
@@ -126,12 +123,12 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddSingleton<IBreezSdkService, OfflineBreezSdkService>();
             builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
             builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
-                
+
             if (options.UseInMemoryStateService)
             {
                 builder.Services.AddScoped<IPaymentStateService, InMemoryPaymentStateService>();
             }
-                
+
             return builder;
         }
     }
