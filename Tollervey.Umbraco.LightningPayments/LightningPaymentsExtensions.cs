@@ -84,6 +84,7 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddHostedService(sp => sp.GetRequiredService<BreezEventProcessor>());
             builder.Services.AddHostedService<PaymentDbInitializer>();
             builder.Services.AddMemoryCache();
+            builder.Services.AddScoped<IRuntimeSettingsService, RuntimeSettingsService>();
 
             builder.Services.AddSingleton<SseHub>();
             builder.Services.AddSingleton<IRateLimiter, MemoryRateLimiter>();

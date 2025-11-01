@@ -1,15 +1,19 @@
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
+@inject Tollervey.Umbraco.LightningPayments.UI.Services.IRuntimeSettingsService Runtime
 @{
- var contentId = Model?.Id as int? ?? (int)(Model?.Content?.Id ?? 0);
+  var flags = Runtime.GetAsync().GetAwaiter().GetResult();
+  if (!flags.Enabled || !flags.PaywallEnabled)
+  {
+      if (flags.HideUiWhenDisabled) { return; }
+  }
+  var contentId = Model?.Id as int? ?? (int)(Model?.Content?.Id ?? 0);
 }
 <script>
   (function(){
     if (!window.__lpClientLoaded) {
-      const s = document.createElement('script');
-      s.type = 'module';
+      const s = document.createElement('script'); s.type = 'module';
       s.src = '/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js';
-      document.head.appendChild(s);
-      window.__lpClientLoaded = true;
+      document.head.appendChild(s); window.__lpClientLoaded = true;
     }
   })();
 </script>

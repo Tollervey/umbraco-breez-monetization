@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration.UserSecrets;
 using Tollervey.Umbraco.LightningPayments.UI.Configuration;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Api.Management.Controllers;
 using Umbraco.Cms.Web.Common.Authorization;
 
@@ -125,6 +126,20 @@ public class LightningSetupController : ManagementApiControllerBase
         {
             return StatusCode(500, new { error = "write_failed", message = "Failed to write dev secrets file.", detail = ex.Message });
         }
+    }
+
+    [HttpGet("Runtime")]
+    public async Task<IActionResult> GetRuntime([FromServices] IRuntimeSettingsService runtime)
+    {
+        var flags = await runtime.GetAsync();
+        return Ok(flags);
+    }
+
+    [HttpPost("Runtime")]
+    public async Task<IActionResult> SaveRuntime([FromServices] IRuntimeSettingsService runtime, [FromBody] RuntimeFeatureFlags flags)
+    {
+        await runtime.SaveAsync(flags);
+        return Ok(new { status = "saved" });
     }
 
     private static string? GetUserSecretsId()
