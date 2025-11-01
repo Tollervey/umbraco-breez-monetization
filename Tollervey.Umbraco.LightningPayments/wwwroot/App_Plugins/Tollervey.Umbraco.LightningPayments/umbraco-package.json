@@ -2,8 +2,9 @@
   "$schema": "https://schemas.umbraco.io/package.schema.json",
   "name": "Tollervey.Umbraco.LightningPayments",
   "version": "1.0.0",
-  "entrypoints": [
+  "extensions": [
     {
+      "type": "js",
       "alias": "Tollervey.Umbraco.LightningPayments.Entrypoint",
       "name": "Lightning Payments Entrypoint",
       "js": [
