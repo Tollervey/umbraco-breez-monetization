@@ -4,117 +4,77 @@ Lightning paywalls and tip jar for Umbraco, powered by Breez SDK (Liquid). Inclu
 
 Quick links
 - Health: GET /health/ready
-- Public API (dev swagger): /swagger
 - Backoffice dashboard: Settings > Lightning Payments
 
-1) Install and configure
-- Add the package to your Umbraco site (NuGet or project reference).
-- In appsettings.json add a LightningPayments section:
+Important defaults
+- Storage: SQLite at App_Data/LightningPayments/payment.db (overridable via LightningPayments:ConnectionString).
+- Migrations: Not required. The package creates/updates the schema at startup.
+- HTTPS: Required by default (controllers/middleware).
+- Swagger: Not bundled. Add Swashbuckle in your host if you want /swagger.
 
+1) Quick start (NuGet consumer)
+- Install the NuGet package into your Umbraco site.
+- Configure secrets (local dev via User Secrets; production via environment variables):
+  - LightningPayments:BreezApiKey
+  - LightningPayments:Mnemonic
+  - Optional: LightningPayments:ConnectionString (defaults to App_Data/LightningPayments/payment.db)
+
+Example appsettings.json section (non-secrets only):
 {
- "LightningPayments": {
- "ConnectionString": "Data Source=~/App_Data/payment.db",
- "BreezApiKey": "YOUR_API_KEY",
- "Mnemonic": "YOUR_24_WORDS",
- "ApplicationInsightsConnectionString": ""
- }
+  "LightningPayments": {
+    "ConnectionString": "Data Source=~/App_Data/LightningPayments/payment.db"
+  }
 }
 
-- Secure secrets via User Secrets or environment variables in production (see README.txt notes).
-- Start the site. The SQLite schema is created automatically and lightweight migrations are applied at startup.
+- Start the site. Health should be green at /health/ready.
 
-2) Health and connectivity
-- Check /health/ready. When healthy, the Breez SDK is set up and the app is ready.
-- In development, navigate to /swagger for public and management endpoints.
+2) Drop-in UI usage
+- Razor partials (auto-load the JS bundle; no layout edits needed):
+  - @await Html.PartialAsync("LightningPayments/TipJar", Model)
+  - @await Html.PartialAsync("LightningPayments/Paywall", Model)
 
-3) Data Types and property editors
-This package registers two property editors under Data Types:
-- Lightning Paywall (alias: Tollervey.Breez.Paywall)
- - Stores JSON with Enabled and Fee (sats)
-- Tip Jar (alias: Tollervey.Breez.TipJar)
- - Stores JSON with enabled, defaultAmounts, label
+- Or use components directly (then you must load the bundle once, e.g., in your layout):
+  <script type="module" src="/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"></script>
 
+3) Website components
+- Paywall
+  <breez-paywall content-id="@Model.Id" title="Unlock content" description="One-time payment"></breez-paywall>
+  Options:
+  - pollIntervalMs (default 2000)
+  - maxWaitMs (default 180000)
+
+- Tip jar
+  <breez-tip-jar title="Send a tip" description="Thanks!" showFiat fiat="USD"></breez-tip-jar>
+  Options:
+  - defaultAmount, amounts=[500,1000,2500] (sats)
+  - contentId (optional)
+  - showFiat, fiat (USD/EUR/GBP)
+
+4) Data Types and property editors
+- Lightning Paywall editor (alias: Tollervey.Breez.Paywall): stores Enabled and Fee (sats).
+- Tip Jar editor (alias: Tollervey.Breez.TipJar): stores defaults for amounts/labels.
 Steps:
-1. In Settings > Data Types, create a new Data Type using editor "Lightning Paywall" and save.
-2. Create a "Tip Jar" Data Type (optional) and configure default amounts.
-3. Add the Paywall/Tip Jar properties to your Document Types.
-4. Set values on content nodes in the Content section.
+1. Create Data Types for Paywall and Tip Jar in Settings > Data Types.
+2. Add the properties to Document Types.
+3. Configure values on content nodes.
 
-4) Backoffice dashboard
-- Settings > Lightning Payments shows connection status, health, limits, and admin actions.
-- Admin-only "All payments" view lists records (requires Administrator).
+5) Backoffice dashboard
+- Settings > Lightning Payments shows connection status, limits, and an admin-only payments list.
 
-5) Website components
-The package ships Web Components you can place in templates or partials.
-
-- Paywall component
-<breez-paywall content-id="@Model.Id" title="Unlock content" description="One-time payment"></breez-paywall>
-
-Behavior:
-- Checks payment status for the current session/cookie and contentId.
-- If unpaid, shows a button that opens an invoice modal and polls confirmation.
-- On payment, reveals slotted content and emits a "breez-unlocked" event.
-
-Options:
-- pollIntervalMs (default2000)
-- maxWaitMs (default180000)
-
-- Tip jar component
-<breez-tip-jar title="Send a tip" description="Thanks!" showFiat fiat="USD"></breez-tip-jar>
-
-Behavior:
-- Creates a tip invoice via public API and presents a modal with QR and BOLT11 string.
-- Shows stats (count and total sats) from a read-only endpoint.
-
-Options:
-- defaultAmount, amounts=[500,1000,2500] (sats)
-- contentId (optional)
-- showFiat, fiat (USD/EUR/GBP)
-
-6) Razor partials and macros
-Use the provided partials or copy the patterns into your templates:
-
-- Partial: Views/Partials/LightningPayments/Paywall.cshtml
-@* Minimal example *@
-<div>
- <breez-paywall content-id="@Model.Id"
- title="Unlock content"
- description="One-time payment to access this article"></breez-paywall>
- <div>
- @* Your gated content can be placed here or in a separate block revealed after payment *@
- </div>
-</div>
-
-- Partial: Views/Partials/LightningPayments/TipJar.cshtml
-@* Minimal example *@
-<div>
- <breez-tip-jar title="Send a tip" description="Thank you for supporting!" showFiat fiat="USD"></breez-tip-jar>
-</div>
-
-You can also wrap these in macros and drop them into rich editors if needed.
-
-7) LNURL and Bolt12
+6) LNURL and Bolt12 (optional)
 - LNURL-Pay metadata: GET /api/public/lightning/GetLnurlPayInfo?contentId=123
 - LNURL invoice callback: GET /api/public/lightning/GetLnurlInvoice?contentId=123&amount=100000 (msats)
-- Optional Bolt12 offer: GET /api/public/lightning/GetBolt12Offer?contentId=123
+- Bolt12 offer: GET /api/public/lightning/GetBolt12Offer?contentId=123
 
-8) Error handling and security
-- All public and management endpoints return consistent JSON error payloads: { "error", "message" }.
-- Backoffice management endpoints require Administrator access.
-- HTTPS is required by default.
-- Session cookie (for paywall state) is HttpOnly, Secure, SameSite=Strict.
+7) Configuration & security
+- Secrets (API key, mnemonic, webhook secret) must not be stored in appsettings.json in Production; use environment variables or a secret store.
+- Webhooks (optional) provide resilience for confirmations. If you set WebhookUrl, set LightningPayments:WebhookSecret and serve HTTPS.
 
-9) Troubleshooting
-- /health/ready fails: verify Breez keys and configuration; inspect logs.
-- Invoices but no confirmation: ensure webhook events reach your site; check logs for payment hash/state.
-- Admin endpoints return401 from Swagger: log into Umbraco backoffice in the same browser (same origin) or supply auth cookie.
-- SQLite file write issues: verify file permissions on the configured path.
-- Offline mode: You can register offline runtime mode in a custom composer if you want synthetic invoices for development/testing.
+8) Troubleshooting
+- Health red: check Breez API key/mnemonic; inspect logs.
+- Invoice never confirms: ensure the site is reachable (webhooks if configured) and check logs for the payment hash.
+- 401 for management APIs: log into Umbraco backoffice in the same browser.
+- SQLite write issues: ensure the App_Data path is writable.
 
-10) Packaging notes
-- The backoffice bundle is declared in Client/public/umbraco-package.json and built to /App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js.
-- Property editor aliases: Tollervey.Breez.Paywall and Tollervey.Breez.TipJar.
-- Dashboard: Lightning Payments Dashboard.
-
-License and contributions
-- Issues and PRs welcome.
+Notes for contributors
+- The backoffice/website bundle is built from Client and emitted as /App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js. NuGet consumers do not need Node; the assets ship in the package.
