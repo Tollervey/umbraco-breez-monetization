@@ -1,19 +1,13 @@
 using System;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Hosting;
-using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 using Tollervey.Umbraco.LightningPayments.UI.Middleware;
-using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Web.Common.ApplicationBuilder;
 using Tollervey.Umbraco.LightningPayments.UI.Components;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.AspNetCore.Http;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 {
@@ -35,19 +29,18 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
             // Conservative default:5 requests per minute per IP. Consumers can override in their host app.
             builder.Services.AddRateLimiter(options =>
             {
-                options.RejectionStatusCode =429; // HTTP429 Too Many Requests
+                options.RejectionStatusCode = 429; // HTTP429 Too Many Requests
 
                 options.AddPolicy("InvoiceGeneration", context =>
-                {
-                    var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                    return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit =5,
-                        Window = TimeSpan.FromMinutes(1),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit =0
-                    });
-                });
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0
+                        }));
             });
 
             // Ensure BreezSdkService is tied to Umbraco app lifecycle
@@ -70,14 +63,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 
                         // Enable rate limiting middleware so actions can opt-in using [EnableRateLimiting("InvoiceGeneration")] attribute.
                         app.UseRateLimiter();
-                    },
-                    // Map health checks in the Endpoints stage.
-                    Endpoints = app =>
-                    {
-                        var settings = app.ApplicationServices.GetRequiredService<IOptions<LightningPaymentsSettings>>().Value;
-                        var healthPath = !string.IsNullOrWhiteSpace(settings.HealthCheckPath) ? (settings.HealthCheckPath.StartsWith("/") ? settings.HealthCheckPath : "/" + settings.HealthCheckPath) : "/health/ready";
-                        app.UseEndpoints(endpoints => endpoints.MapHealthChecks(healthPath));
                     }
+                    // No Endpoints mapping here – the host app will map health checks.
                 });
             });
 
