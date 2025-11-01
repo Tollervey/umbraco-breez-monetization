@@ -1,14 +1,14 @@
 {
-  "id": "Tollervey.Umbraco.LightningPayments",
+  "$schema": "https://schemas.umbraco.io/package.schema.json",
   "name": "Tollervey.Umbraco.LightningPayments",
-  "version": "0.0.0",
-  "allowTelemetry": true,
-  "extensions": [
+  "version": "1.0.0",
+  "entrypoints": [
     {
-      "name": "Lightning Payments Bundle",
-      "alias": "Tollervey.LightningPayments.Bundle",
-      "type": "bundle",
-      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
+      "alias": "Tollervey.Umbraco.LightningPayments.Entrypoint",
+      "name": "Lightning Payments Entrypoint",
+      "js": [
+        "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
+      ]
     }
   ]
 }

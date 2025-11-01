@@ -1,4 +1,19 @@
-const e = [], a = [
+const e = [
+  {
+    type: "dashboard",
+    alias: "Tollervey.LightningPayments.Setup",
+    name: "Lightning Payments Setup",
+    element: "umb-lp-setup-dashboard",
+    loader: () => import("./lightning-setup-dashboard.element-CeVcCqQA.js"),
+    weight: 10,
+    meta: {
+      label: "Lightning Payments Setup",
+      pathname: "lightning-payments-setup",
+      icon: "icon-thunder"
+    },
+    conditions: [{ alias: "Umb.Condition.SectionAlias", value: "settings" }]
+  }
+], a = [
   // Paywall property editor UI
   {
     type: "propertyEditorUi",
@@ -68,12 +83,12 @@ const e = [], a = [
       pathname: "lightning-payments"
     }
   }
-], l = [
+], i = [
   ...e,
   ...a,
   ...t
 ];
 export {
-  l as manifests
+  i as manifests
 };
 //# sourceMappingURL=lightning-ui.js.map
