@@ -118,17 +118,19 @@ namespace Microsoft.Extensions.DependencyInjection
             configure?.Invoke(options);
 
             builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: true));
-            builder.Services.AddSingleton<IOptions<OfflineLightningPaymentsOptions>>(_ => Options.Create(options));
+            builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptions<OfflineLightningPaymentsOptions>>(
+                _ => Microsoft.Extensions.Options.Options.Create(options)
+            );
 
             builder.Services.AddSingleton<IBreezSdkService, OfflineBreezSdkService>();
             builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
             builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
-
+                
             if (options.UseInMemoryStateService)
             {
                 builder.Services.AddScoped<IPaymentStateService, InMemoryPaymentStateService>();
             }
-
+                
             return builder;
         }
     }

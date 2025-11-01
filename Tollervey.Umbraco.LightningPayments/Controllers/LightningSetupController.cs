@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
@@ -32,13 +33,16 @@ public class LightningSetupController : ManagementApiControllerBase
         var hasApiKey = !string.IsNullOrWhiteSpace(_settings.BreezApiKey);
         var hasMnemonic = !string.IsNullOrWhiteSpace(_settings.Mnemonic);
         var conn = _settings.ConnectionString;
+        var network = _settings.Network.ToString();
+
         return Ok(new
         {
             environment = dev ? "Development" : (_env.IsProduction() ? "Production" : "Other"),
             canSaveDevSecrets = dev,
             hasApiKey,
             hasMnemonic,
-            connectionString = conn
+            connectionString = conn,
+            network
         });
     }
 
@@ -47,6 +51,7 @@ public class LightningSetupController : ManagementApiControllerBase
         public string? BreezApiKey { get; set; }
         public string? Mnemonic { get; set; }
         public string? ConnectionString { get; set; }
+        public string? Network { get; set; } // "Mainnet" | "Testnet" | "Regtest"
     }
 
     [HttpPost("SaveDevSecrets")]
@@ -61,6 +66,17 @@ public class LightningSetupController : ManagementApiControllerBase
             return BadRequest(new { error = "invalid_request", message = "BreezApiKey and Mnemonic are required." });
         }
 
+        // Validate network value if provided (case-insensitive)
+        string? normalizedNetwork = null;
+        if (!string.IsNullOrWhiteSpace(req.Network))
+        {
+            if (!Enum.TryParse<LightningPaymentsSettings.LightningNetwork>(req.Network, ignoreCase: true, out var parsed))
+            {
+                return BadRequest(new { error = "invalid_request", message = "Network must be one of: Mainnet, Testnet, Regtest." });
+            }
+            normalizedNetwork = parsed.ToString();
+        }
+
         var secretsId = GetUserSecretsId();
         if (string.IsNullOrWhiteSpace(secretsId))
         {
@@ -71,7 +87,7 @@ public class LightningSetupController : ManagementApiControllerBase
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var json = File.Exists(path) ? File.ReadAllText(path) : "{}";
+            var json = System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : "{}";
             using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
             var root = doc.RootElement.Clone();
 
@@ -85,20 +101,24 @@ public class LightningSetupController : ManagementApiControllerBase
                 ? dict["LightningPayments"].EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone())
                 : new Dictionary<string, JsonElement>();
 
-            lp["BreezApiKey"] = JsonDocument.Parse(JsonSerializer.Serialize(req.BreezApiKey)).RootElement.Clone();
-            lp["Mnemonic"] = JsonDocument.Parse(JsonSerializer.Serialize(req.Mnemonic)).RootElement.Clone();
+            lp["BreezApiKey"] = JsonDocument.Parse(JsonSerializer.Serialize(req.BreezApiKey.Trim())).RootElement.Clone();
+            lp["Mnemonic"] = JsonDocument.Parse(JsonSerializer.Serialize(req.Mnemonic.Trim())).RootElement.Clone();
             if (!string.IsNullOrWhiteSpace(req.ConnectionString))
             {
-                lp["ConnectionString"] = JsonDocument.Parse(JsonSerializer.Serialize(req.ConnectionString)).RootElement.Clone();
+                lp["ConnectionString"] = JsonDocument.Parse(JsonSerializer.Serialize(req.ConnectionString.Trim())).RootElement.Clone();
+            }
+            if (!string.IsNullOrWhiteSpace(normalizedNetwork))
+            {
+                lp["Network"] = JsonDocument.Parse(JsonSerializer.Serialize(normalizedNetwork)).RootElement.Clone();
             }
 
             dict["LightningPayments"] = JsonDocument.Parse(JsonSerializer.Serialize(lp)).RootElement.Clone();
 
             var finalObj = JsonDocument.Parse(JsonSerializer.Serialize(dict)).RootElement.Clone();
             var finalJson = JsonSerializer.Serialize(finalObj, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(path, finalJson);
+            System.IO.File.WriteAllText(path, finalJson);
 
-            // Inform caller to restart for SDK to pick up fresh values (or rely on config reload + manual refresh)
+            // Inform caller to restart for SDK to pick up fresh values
             return Ok(new { status = "saved", secretsPath = path, restartRequired = true });
         }
         catch (Exception ex)
