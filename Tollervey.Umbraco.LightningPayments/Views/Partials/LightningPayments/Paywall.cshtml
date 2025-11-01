@@ -2,23 +2,10 @@
 @inject Tollervey.Umbraco.LightningPayments.UI.Services.IRuntimeSettingsService Runtime
 @{
   var flags = await Runtime.GetAsync();
-  if (!flags.Enabled || !flags.PaywallEnabled)
+  if (!flags.Enabled || !flags.TipJarEnabled)
   {
       if (flags.HideUiWhenDisabled) { return; }
   }
-
-  // Prefer the assigned content item id, then try model Id/Content.Id, finally 0.
-  var contentId =
-      (Umbraco?.AssignedContentItem?.Id) ??
-      (Model?.Id is int id1 ? id1 : (Model?.Content?.Id is int id2 ? id2 : 0));
 }
-<script>
-  (function(){
-    if (!window.__lpClientLoaded) {
-      const s = document.createElement('script'); s.type = 'module';
-      s.src = '/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js';
-      document.head.appendChild(s); window.__lpClientLoaded = true;
-    }
-  })();
-</script>
-<breez-paywall content-id="@contentId" buttonlabel="Pay to unlock" title="Unlock content" description="One-time Lightning payment to access this content."></breez-paywall>
+@await Html.PartialAsync("LightningPayments/_ClientLoader")
+<breez-tip-jar title="Buy me a coffee" description="Thanks for your support!" defaultamount="1000"></breez-tip-jar>

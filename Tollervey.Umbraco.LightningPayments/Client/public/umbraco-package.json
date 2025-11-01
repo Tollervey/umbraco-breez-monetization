@@ -2,17 +2,6 @@
   "$schema": "https://schemas.umbraco.io/package.schema.json",
   "name": "Tollervey.Umbraco.LightningPayments",
   "version": "1.0.0",
-  "extensions": [
-    {
-      "type": "bundle",
-      "name": "Lightning Payments Backoffice",
-      "alias": "Tollervey.Umbraco.LightningPayments.Backoffice",
-      "js": [
-        "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
-      ],
-      "conditions": []
-    }
-  ],
   "entrypoints": [
     {
       "alias": "Tollervey.Umbraco.LightningPayments.Entrypoint",

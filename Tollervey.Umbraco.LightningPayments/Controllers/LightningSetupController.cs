@@ -129,16 +129,17 @@ public class LightningSetupController : ManagementApiControllerBase
     }
 
     [HttpGet("Runtime")]
-    public async Task<IActionResult> GetRuntime([FromServices] IRuntimeSettingsService runtime)
+    public async Task<IActionResult> GetRuntime([FromServices] IRuntimeSettingsService runtime, CancellationToken ct)
     {
-        var flags = await runtime.GetAsync();
+        var flags = await runtime.GetAsync(ct);
         return Ok(flags);
     }
 
     [HttpPost("Runtime")]
-    public async Task<IActionResult> SaveRuntime([FromServices] IRuntimeSettingsService runtime, [FromBody] RuntimeFeatureFlags flags)
+    public async Task<IActionResult> SaveRuntime([FromServices] IRuntimeSettingsService runtime, [FromBody] RuntimeFeatureFlags flags, CancellationToken ct)
     {
-        await runtime.SaveAsync(flags);
+        if (flags is null) return BadRequest(new { error = "invalid_request", message = "Flags payload is required." });
+        await runtime.SaveAsync(flags, ct);
         return Ok(new { status = "saved" });
     }
 

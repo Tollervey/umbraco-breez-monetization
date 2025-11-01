@@ -10,6 +10,13 @@ type SetupState = {
   network: 'Mainnet' | 'Testnet' | 'Regtest';
 };
 
+type RuntimeFlags = {
+  enabled: boolean;
+  hideUiWhenDisabled: boolean;
+  tipJarEnabled: boolean;
+  paywallEnabled: boolean;
+};
+
 @customElement('umb-lp-setup-dashboard')
 export class UmbLpSetupDashboardElement extends UmbLitElement {
   static styles = css`
@@ -22,11 +29,15 @@ export class UmbLpSetupDashboardElement extends UmbLitElement {
     .err { color: var(--uui-color-danger); }
     form uui-input, form uui-textarea, form select { width: 100%; }
     select { padding: .4rem; }
+    .flags { display: grid; gap: .5rem; }
+    .flag-row { display: flex; align-items: center; justify-content: space-between; }
   `;
 
   @state() private _loading = true;
   @state() private _saving = false;
+  @state() private _savingFlags = false;
   @state() private _state: SetupState | null = null;
+  @state() private _flags: RuntimeFlags | null = null;
   @state() private _apiKey = '';
   @state() private _mnemonic = '';
   @state() private _conn = '';
@@ -40,15 +51,25 @@ export class UmbLpSetupDashboardElement extends UmbLitElement {
   private async _load() {
     this._loading = true;
     try {
-      const res = await fetch('/umbraco/management/api/LightningSetup/State', { credentials: 'same-origin' });
-      if (!res.ok) throw new Error('Failed to load state');
-      const json = (await res.json()) as SetupState;
-      this._state = json;
-      this._conn = json.connectionString ?? '';
-      this._network = json.network ?? 'Mainnet';
+      // Load setup state and flags in parallel
+      const [stateRes, flagsRes] = await Promise.all([
+        fetch('/umbraco/management/api/LightningSetup/State', { credentials: 'same-origin' }),
+        fetch('/umbraco/management/api/LightningSetup/Runtime', { credentials: 'same-origin' }),
+      ]);
+
+      if (!stateRes.ok) throw new Error('Failed to load state');
+      const stateJson = (await stateRes.json()) as SetupState;
+      this._state = stateJson;
+      this._conn = stateJson.connectionString ?? '';
+      this._network = stateJson.network ?? 'Mainnet';
+
+      if (!flagsRes.ok) throw new Error('Failed to load runtime flags');
+      const flagsJson = (await flagsRes.json()) as RuntimeFlags;
+      this._flags = flagsJson;
     } catch (err) {
       console.error(err);
       this._state = null;
+      this._flags = null;
     } finally {
       this._loading = false;
     }
@@ -105,6 +126,44 @@ export class UmbLpSetupDashboardElement extends UmbLitElement {
     }
   }
 
+  private async _saveFlags(next: RuntimeFlags) {
+    this._savingFlags = true;
+    try {
+      const res = await fetch('/umbraco/management/api/LightningSetup/Runtime', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(next), // property names match JsonPropertyName in server model
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.message || 'Failed to save runtime flags');
+
+      (window as any).UmbNotification?.open?.({
+        color: 'positive',
+        headline: 'Runtime flags saved',
+        message: 'Changes applied.',
+      });
+      this._flags = next;
+    } catch (err: any) {
+      console.error(err);
+      (window as any).UmbNotification?.open?.({
+        color: 'danger',
+        headline: 'Error',
+        message: err?.message ?? 'Failed to save runtime flags.',
+      });
+      // reload to ensure UI matches server
+      await this._load();
+    } finally {
+      this._savingFlags = false;
+    }
+  }
+
+  private _toggleFlag<K extends keyof RuntimeFlags>(key: K, checked: boolean) {
+    if (!this._flags) return;
+    const next = { ...this._flags, [key]: checked } as RuntimeFlags;
+    void this._saveFlags(next);
+  }
+
   private _renderProdHelp() {
     return html`
       <uui-box headline="Production configuration">
@@ -158,9 +217,55 @@ LightningPayments__Network=Mainnet</pre>
     `;
   }
 
+  private _renderFlags() {
+    if (!this._flags) return null;
+    return html`
+      <uui-box headline="Runtime flags">
+        <div class="flags">
+          <div class="flag-row">
+            <div>Enabled</div>
+            <uui-toggle
+              ?disabled=${this._savingFlags}
+              .checked=${this._flags.enabled}
+              @change=${(e: any) => this._toggleFlag('enabled', !!e.target.checked)}>
+            </uui-toggle>
+          </div>
+
+          <div class="flag-row">
+            <div>Hide UI when disabled</div>
+            <uui-toggle
+              ?disabled=${this._savingFlags}
+              .checked=${this._flags.hideUiWhenDisabled}
+              @change=${(e: any) => this._toggleFlag('hideUiWhenDisabled', !!e.target.checked)}>
+            </uui-toggle>
+          </div>
+
+          <div class="flag-row">
+            <div>Tip jar enabled</div>
+            <uui-toggle
+              ?disabled=${this._savingFlags}
+              .checked=${this._flags.tipJarEnabled}
+              @change=${(e: any) => this._toggleFlag('tipJarEnabled', !!e.target.checked)}>
+            </uui-toggle>
+          </div>
+
+          <div class="flag-row">
+            <div>Paywall enabled</div>
+            <uui-toggle
+              ?disabled=${this._savingFlags}
+              .checked=${this._flags.paywallEnabled}
+              @change=${(e: any) => this._toggleFlag('paywallEnabled', !!e.target.checked)}>
+            </uui-toggle>
+          </div>
+        </div>
+      </uui-box>
+    `;
+  }
+
   private _renderStatus() {
     if (!this._state) return null;
     const ok = this._state.hasApiKey && this._state.hasMnemonic;
+    const csSet = !!(this._state.connectionString && this._state.connectionString.trim());
     return html`
       <uui-box headline="Status">
         <div class=${ok ? 'ok' : 'warn'}>
@@ -168,6 +273,7 @@ LightningPayments__Network=Mainnet</pre>
         </div>
         <div class="muted">Environment: ${this._state.environment}</div>
         <div class="muted">Network: ${this._state.network}</div>
+        <div class="muted">Connection string: ${csSet ? 'set' : 'not set'}</div>
       </uui-box>
     `;
   }
@@ -183,6 +289,7 @@ LightningPayments__Network=Mainnet</pre>
         </uui-box>
 
         ${this._renderStatus()}
+        ${this._renderFlags()}
 
         ${this._state?.environment === 'Development' && this._state?.canSaveDevSecrets
           ? this._renderDevForm()
