@@ -16,10 +16,10 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         // Shared constants for headers, defaults and cookie names used across the library.
         public const string IdempotencyKeyHeader = "Idempotency-Key";
         public const string BreezSignatureHeader = "X-Breez-Signature";
-        public const string DefaultConnectionString = "Data Source=payment.db";
+        public const string DefaultConnectionString = "Data Source=App_Data/LightningPayments/payment.db";
         public const string DefaultHealthPath = "/health/ready";
         public const string PaywallCookieName = "LightningPaymentsSession";
-        public const long MaxWebhookBodyBytes =64 *1024;
+        public const long MaxWebhookBodyBytes = 64 * 1024;
 
         // Central invoice description validation regex (shared so both offline and live path use same rules)
         public static readonly Regex DescriptionAllowed = new(@"^[\w\s.,'?!@#$%^&*()_+\-\=\[\]{}|;:]*$", RegexOptions.Compiled);
@@ -39,116 +39,76 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
         public string Mnemonic { get; init; } = string.Empty;
 
         /// <summary>
-        /// The URL for webhook notifications.
+        /// Optional webhook URL for confirmations resilience.
         /// </summary>
         [Url]
         public string? WebhookUrl { get; init; }
 
         /// <summary>
-        /// The database connection string.
+        /// The database connection string. Defaults to a local file under App_Data.
         /// </summary>
         [Required]
         [MinLength(1)]
         public string ConnectionString { get; init; } = DefaultConnectionString;
 
         /// <summary>
-        /// The URL for the paywall page.
-        /// </summary>
-        public string PaywallUrl { get; init; } = "/paywall";
-
-        /// <summary>
-        /// The secret key for webhook signature verification.
-        /// </summary>
-        public string WebhookSecret { get; init; } = string.Empty;
-
-        /// <summary>
-        /// The Application Insights connection string for monitoring.
-        /// </summary>
-        public string ApplicationInsightsConnectionString { get; init; } = string.Empty;
-
-        /// <summary>
-        /// The admin email for payment notifications.
+        /// Optional admin email for notifications. Not required.
         /// </summary>
         public string AdminEmail { get; init; } = string.Empty;
 
         /// <summary>
-        /// The network for the Lightning Payments, default is Mainnet.
+        /// Optional webhook secret for HMAC verification (recommended when WebhookUrl is set).
+        /// </summary>
+        public string WebhookSecret { get; init; } = string.Empty;
+
+        /// <summary>
+        /// The Application Insights connection string for monitoring (optional).
+        /// </summary>
+        public string ApplicationInsightsConnectionString { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Lightning network (Mainnet default).
         /// </summary>
         public LightningNetwork Network { get; init; } = LightningNetwork.Mainnet;
 
         /// <summary>
-        /// The SMTP host for sending emails.
-        /// </summary>
-        [Required]
-        [MinLength(1)]
-        public string SmtpHost { get; init; } = string.Empty;
-
-        /// <summary>
-        /// The SMTP port for sending emails.
-        /// </summary>
-        [Required]
-        [Range(1,65535)]
-        public int SmtpPort { get; init; } =587;
-
-        /// <summary>
-        /// The SMTP username for authentication.
-        /// </summary>
-        [Required]
-        [MinLength(1)]
-        public string SmtpUsername { get; init; } = string.Empty;
-
-        /// <summary>
-        /// The SMTP password for authentication.
-        /// </summary>
-        [Required]
-        [MinLength(1)]
-        public string SmtpPassword { get; init; } = string.Empty;
-
-        /// <summary>
-        /// The from email address for sent emails.
-        /// </summary>
-        [Required]
-        [EmailAddress]
-        [MinLength(1)]
-        public string FromEmailAddress { get; init; } = string.Empty;
-
-        /// <summary>
-        /// The maximum invoice amount in satoshis.
-        /// </summary>
-        [Range(1, ulong.MaxValue)]
-        public ulong MaxInvoiceAmountSat { get; init; } =10_000_000;
-
-        /// <summary>
-        /// The maximum length of the invoice description.
-        /// </summary>
-        [Range(1,1024)]
-        public int MaxInvoiceDescriptionLength { get; init; } =200;
-
-        /// <summary>
-        /// Session cookie SameSite mode. Defaults to Strict to prevent cross-site sends.
-        /// Use Lax only if you need cross-subdomain flows and accept the trade-offs.
-        /// </summary>
-        public SameSiteMode SessionCookieSameSite { get; init; } = SameSiteMode.Strict;
-
-        /// <summary>
-        /// Optional cookie domain for subdomain scoping (e.g. .example.com).
-        /// Leave null/empty to use host-only cookie.
-        /// </summary>
-        public string? SessionCookieDomain { get; init; }
-
-        /// <summary>
         /// Health check endpoint path. Defaults to "/health/ready".
-        /// Can be overridden by consumers via configuration.
         /// </summary>
         [MinLength(1)]
         public string HealthCheckPath { get; init; } = DefaultHealthPath;
 
         /// <summary>
+        /// Session cookie SameSite mode. Defaults to Strict.
+        /// </summary>
+        public SameSiteMode SessionCookieSameSite { get; init; } = SameSiteMode.Strict;
+
+        /// <summary>
+        /// Optional cookie domain for subdomain scoping (e.g. .example.com).
+        /// </summary>
+        public string? SessionCookieDomain { get; init; }
+
+        /// <summary>
         /// Optional working directory for the Breez SDK. If not set, defaults to '<content-root>/App_Data/LightningPayments/'.
-        /// Consumers should prefer a dedicated secure path outside the webroot and ensure restrictive filesystem ACLs.
-        /// Example environment variable: "LightningPayments__WorkingDirectory"
         /// </summary>
         public string? WorkingDirectory { get; init; }
-    }
 
+        // SMTP settings removed from "required" usage; email is disabled by default.
+        public string SmtpHost { get; init; } = string.Empty;
+        public int SmtpPort { get; init; } = 587;
+        public string SmtpUsername { get; init; } = string.Empty;
+        public string SmtpPassword { get; init; } = string.Empty;
+        public string FromEmailAddress { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Maximum invoice amount in satoshis.
+        /// </summary>
+        [Range(1, ulong.MaxValue)]
+        public ulong MaxInvoiceAmountSat { get; init; } = 10_000_000;
+
+        /// <summary>
+        /// Maximum length of the invoice description.
+        /// </summary>
+        [Range(1, 1024)]
+        public int MaxInvoiceDescriptionLength { get; init; } = 200;
+    }
 }

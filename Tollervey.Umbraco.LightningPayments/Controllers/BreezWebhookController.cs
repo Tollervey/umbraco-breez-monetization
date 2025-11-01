@@ -19,23 +19,20 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
     [RequireHttps]
     public class BreezWebhookController : UmbracoApiControllerBase
     {
-        private const long MaxWebhookBodyBytes = LightningPaymentsSettings.MaxWebhookBodyBytes; // 64 KB
+        private const long MaxWebhookBodyBytes = LightningPaymentsSettings.MaxWebhookBodyBytes;
 
         private readonly IPaymentStateService _paymentStateService;
         private readonly ILogger<BreezWebhookController> _logger;
         private readonly LightningPaymentsSettings _settings;
-        private readonly IEmailService _emailService;
 
         public BreezWebhookController(
             IPaymentStateService paymentStateService,
             ILogger<BreezWebhookController> logger,
-            IOptions<LightningPaymentsSettings> settings,
-            IEmailService emailService)
+            IOptions<LightningPaymentsSettings> settings)
         {
             _paymentStateService = paymentStateService;
             _logger = logger;
             _settings = settings.Value;
-            _emailService = emailService;
         }
 
         /// <summary>
@@ -128,11 +125,6 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 if (updated)
                 {
                     _logger.LogInformation("Payment {Status} for hash: {PaymentHash}", status, paymentHash);
-                    // Notify admin
-                    if (!string.IsNullOrEmpty(_settings.AdminEmail))
-                    {
-                        await _emailService.SendEmailAsync(_settings.AdminEmail, $"Payment {status.ToUpperInvariant()}", $"A payment has been {status} for content ID associated with hash {paymentHash}.");
-                    }
                     return Ok(new { status });
                 }
                 else

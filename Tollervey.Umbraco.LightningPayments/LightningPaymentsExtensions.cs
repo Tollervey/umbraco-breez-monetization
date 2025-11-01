@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using System;
+using System.ComponentModel;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -20,12 +21,6 @@ namespace Microsoft.Extensions.DependencyInjection
     /// </summary>
     public static class LightningPaymentsExtensions
     {
-        /// <summary>
-        /// Adds Lightning Payments services, options, health checks, and infrastructure to the Umbraco builder.
-        /// Call this in a composer during startup.
-        /// </summary>
-        /// <param name="builder">The Umbraco builder.</param>
-        /// <returns>The same <paramref name="builder"/> for chaining.</returns>
         public static IUmbracoBuilder AddLightningPayments(this IUmbracoBuilder builder)
         {
             // Bind the "LightningPayments" section of appsettings to the settings model
@@ -50,16 +45,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
                     options.AddPolicy("InvoiceGeneration", context =>
                     {
-                        string partitionKey;
-                        if (rlOptions.PartitionByIp)
-                        {
-                            partitionKey = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                        }
-                        else
-                        {
-                            // fallback partition key when not partitioning by IP
-                            partitionKey = "default";
-                        }
+                        string partitionKey = rlOptions.PartitionByIp
+                            ? (context.Connection.RemoteIpAddress?.ToString() ?? "unknown")
+                            : "default";
 
                         return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
                         {
@@ -79,13 +67,14 @@ namespace Microsoft.Extensions.DependencyInjection
             // AddLightningPaymentsApplicationInsights on the IUmbracoBuilder if they want AI wired up for this library.
 
             // Register services
-            builder.Services.AddDbContext<PaymentDbContext>((serviceProvider, options) =>
+            builder.Services.AddDbContext<PaymentDbContext>((sp, options) =>
             {
-                var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<LightningPaymentsSettings>>().Value;
+                var settings = sp.GetRequiredService<IOptions<LightningPaymentsSettings>>().Value;
                 options.UseSqlite(settings.ConnectionString);
             });
             builder.Services.AddScoped<IPaymentStateService, PersistentPaymentStateService>();
-            builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+            // Email removed by default to simplify setup: no IEmailService registration.
+
             builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
             builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
             builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
@@ -96,68 +85,45 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddHostedService<PaymentDbInitializer>();
             builder.Services.AddMemoryCache();
 
-            // Realtime hub (SSE)
             builder.Services.AddSingleton<SseHub>();
-
-            // Rate limiter (in-code, used by helper if ASP.NET Core limiter not enabled)
             builder.Services.AddSingleton<IRateLimiter, MemoryRateLimiter>();
             builder.Services.AddScoped<IInvoiceHelper, InvoiceHelper>();
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
 
-            // Middleware and endpoint registration moved to Composer to ensure correct Umbraco pipeline ordering.
-
             return builder;
         }
 
-        /// <summary>
-        /// Registers Application Insights telemetry for the host when using the Lightning Payments package.
-        /// Call this from the consuming application's startup if Application Insights is desired.
-        /// </summary>
-        /// <param name="builder">The Umbraco builder.</param>
-        /// <param name="connectionString">Application Insights connection string.</param>
-        /// <returns>The same <paramref name="builder"/> for chaining.</returns>
         public static IUmbracoBuilder AddLightningPaymentsApplicationInsights(this IUmbracoBuilder builder, string connectionString)
         {
             if (!string.IsNullOrWhiteSpace(connectionString))
             {
-                builder.Services.AddApplicationInsightsTelemetry(options => { options.ConnectionString = connectionString; });
+                builder.Services.AddApplicationInsightsTelemetry(o => o.ConnectionString = connectionString);
             }
             return builder;
         }
 
-        /// <summary>
-        /// Registers Application Insights telemetry using the configured value in the LightningPayments configuration section.
-        /// This is a convenience method; the consumer can also call AddLightningPaymentsApplicationInsights explicitly.
-        /// </summary>
         public static IUmbracoBuilder AddLightningPaymentsApplicationInsightsFromConfig(this IUmbracoBuilder builder)
         {
             var aiConnectionString = builder.Config.GetSection(LightningPaymentsSettings.SectionName)["ApplicationInsightsConnectionString"];
             return builder.AddLightningPaymentsApplicationInsights(aiConnectionString ?? string.Empty);
         }
 
-        /// <summary>
-        /// Enables offline mode where no calls to Breez SDK are made and a mocked service simulates invoices and confirmations.
-        /// Useful for development or demos without network access.
-        /// </summary>
-        /// <param name="builder">The Umbraco builder.</param>
-        /// <param name="configure">Optional configuration for offline behavior.</param>
-        /// <returns>The same <paramref name="builder"/> for chaining.</returns>
+        // Hide offline mode (still present for dev-internal use, but discouraged for consumers)
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        [Obsolete("Offline mode is not exposed in this release.", error: false)]
         public static IUmbracoBuilder UseLightningPaymentsOffline(this IUmbracoBuilder builder, Action<OfflineLightningPaymentsOptions>? configure = null)
         {
             var options = new OfflineLightningPaymentsOptions();
             configure?.Invoke(options);
 
-            // Replace the runtime mode marker
             builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: true));
-            builder.Services.AddSingleton<IOptions<OfflineLightningPaymentsOptions>>(_ => Microsoft.Extensions.Options.Options.Create(options));
+            builder.Services.AddSingleton<IOptions<OfflineLightningPaymentsOptions>>(_ => Options.Create(options));
 
-            // Replace the SDK service with the offline implementation
             builder.Services.AddSingleton<IBreezSdkService, OfflineBreezSdkService>();
             builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
             builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
 
-            // Optionally replace persistent payment state with in-memory state to avoid touching storage
             if (options.UseInMemoryStateService)
             {
                 builder.Services.AddScoped<IPaymentStateService, InMemoryPaymentStateService>();

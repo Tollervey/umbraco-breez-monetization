@@ -57,14 +57,12 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Configuration
                 if (!string.IsNullOrWhiteSpace(options.BreezApiKey) && !HasEnv("LightningPayments__BreezApiKey")) leaked.Add("BreezApiKey");
                 if (!string.IsNullOrWhiteSpace(options.Mnemonic) && !HasEnv("LightningPayments__Mnemonic")) leaked.Add("Mnemonic");
                 if (!string.IsNullOrWhiteSpace(options.WebhookSecret) && !HasEnv("LightningPayments__WebhookSecret")) leaked.Add("WebhookSecret");
-                if (!string.IsNullOrWhiteSpace(options.SmtpPassword) && !HasEnv("LightningPayments__SmtpPassword")) leaked.Add("SmtpPassword");
 
                 if (leaked.Any())
                 {
                     var msg = $"Detected secret-like configuration values present in app configuration for: {string.Join(", ", leaked)}. " +
                         "In Production you must provide secrets via environment variables, a secret store (e.g., Azure Key Vault), or another secure configuration provider. " +
                         "Remove these values from appsettings.json and supply them via a secure provider. For local development, use 'dotnet user-secrets'.";
-
                     _logger.LogCritical(msg);
                     errors.Add(msg);
                     return ValidateOptionsResult.Fail(errors);

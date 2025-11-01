@@ -1,6 +1,16 @@
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
 @{
- var contentId = Model?.Id as int? ?? (int)(Model?.Content?.Id ??0);
+ var contentId = Model?.Id as int? ?? (int)(Model?.Content?.Id ?? 0);
 }
-
+<script>
+  (function(){
+    if (!window.__lpClientLoaded) {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.src = '/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js';
+      document.head.appendChild(s);
+      window.__lpClientLoaded = true;
+    }
+  })();
+</script>
 <breez-paywall content-id="@contentId" buttonlabel="Pay to unlock" title="Unlock content" description="One-time Lightning payment to access this content."></breez-paywall>

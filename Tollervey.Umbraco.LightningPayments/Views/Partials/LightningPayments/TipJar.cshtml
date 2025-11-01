@@ -1,2 +1,14 @@
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
+<script>
+  // idempotent client loader
+  (function(){
+    if (!window.__lpClientLoaded) {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.src = '/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js';
+      document.head.appendChild(s);
+      window.__lpClientLoaded = true;
+    }
+  })();
+</script>
 <breez-tip-jar title="Buy me a coffee" description="Thanks for your support!" defaultamount="1000"></breez-tip-jar>
