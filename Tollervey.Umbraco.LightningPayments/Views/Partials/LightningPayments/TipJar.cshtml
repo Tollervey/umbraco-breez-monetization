@@ -1,7 +1,7 @@
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
 @inject Tollervey.Umbraco.LightningPayments.UI.Services.IRuntimeSettingsService Runtime
 @{
-  var flags = Runtime.GetAsync().GetAwaiter().GetResult();
+  var flags = await Runtime.GetAsync();
   if (!flags.Enabled || !flags.TipJarEnabled)
   {
       if (flags.HideUiWhenDisabled) { return; }

@@ -1,12 +1,16 @@
 @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
 @inject Tollervey.Umbraco.LightningPayments.UI.Services.IRuntimeSettingsService Runtime
 @{
-  var flags = Runtime.GetAsync().GetAwaiter().GetResult();
+  var flags = await Runtime.GetAsync();
   if (!flags.Enabled || !flags.PaywallEnabled)
   {
       if (flags.HideUiWhenDisabled) { return; }
   }
-  var contentId = Model?.Id as int? ?? (int)(Model?.Content?.Id ?? 0);
+
+  // Prefer the assigned content item id, then try model Id/Content.Id, finally 0.
+  var contentId =
+      (Umbraco?.AssignedContentItem?.Id) ??
+      (Model?.Id is int id1 ? id1 : (Model?.Content?.Id is int id2 ? id2 : 0));
 }
 <script>
   (function(){
