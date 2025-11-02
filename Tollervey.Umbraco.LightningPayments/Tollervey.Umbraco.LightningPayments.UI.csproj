@@ -4,7 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
-    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
     <!-- Generate XML documentation for NuGet consumers -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Suppress missing XML docs warnings to keep builds clean while shipping docs -->
