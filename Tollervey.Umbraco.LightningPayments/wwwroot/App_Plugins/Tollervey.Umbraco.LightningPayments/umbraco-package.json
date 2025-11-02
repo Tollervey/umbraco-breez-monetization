@@ -1,14 +1,11 @@
 {
-  "$schema": "https://docs.umbraco.com/json-schema/umbraco-package-schema.json",
-  "name": "Lightning Payments",
-  "version": "0.1.1",
+  "name": "Lightning Payments (Minimal Test)",
+  "version": "99.0.0",
   "extensions": [
     {
       "type": "entryPoint",
-      "name": "tollervey-lightning",
-      "js": [
-        "/_content/Tollervey.Umbraco.LightningPayments/App_Plugins/Tollervey.Umbraco.LightningPayments/entrypoint-BqzT7OLN.js"
-      ]
+      "name": "Minimal Test Entry Point",
+      "js": "/_content/Tollervey.Umbraco.LightningPayments/App_Plugins/Tollervey.Umbraco.LightningPayments/minimal-test.js"
     }
   ]
 }
