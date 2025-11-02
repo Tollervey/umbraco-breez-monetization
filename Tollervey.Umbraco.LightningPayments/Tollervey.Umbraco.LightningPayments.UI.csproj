@@ -10,6 +10,9 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
     <BuildClientOnPack>true</BuildClientOnPack>
 
+    <!-- Build client + copy manifest during regular Build for local F5 runs -->
+    <BuildClientOnBuild>true</BuildClientOnBuild>
+
     <!-- Enable .NET analyzers and use the latest analysis level. Do not treat warnings as errors here to avoid breaking consumers; CI can enable that. -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
@@ -101,6 +104,7 @@
 		<PackageOutputPath>C:\LocalNuget\</PackageOutputPath>
 	</PropertyGroup>
 
+  <!-- PACK pipeline (unchanged) -->
   <Target Name="DetectNodeTools" Condition="'$(BuildClientOnPack)' == 'true'" BeforeTargets="Pack">
     <Exec Command="node --version" IgnoreExitCode="true">
       <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
@@ -130,8 +134,16 @@
     <WriteLinesToFile File="$(IntermediateOutputPath)client.complete.txt" Lines="@(_ClientAssetsBuildOutput)" Overwrite="true" />
   </Target>
 
-  <!-- Copy the manifest from Client/public into wwwroot just before packing (after client build) -->
-  <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Pack" DependsOnTargets="BuildClient">
+  <!-- BUILD pipeline (new): build client + copy/validate manifest for local runs -->
+  <Target Name="BuildClient_OnBuild" BeforeTargets="Build"
+          Condition="'$(BuildClientOnBuild)'=='true' and Exists('Client\package.json')">
+    <Message Importance="high" Text="Executing Client NPM build script (Build)..." />
+    <Exec Command="npm ci" WorkingDirectory="Client" />
+    <Exec Command="npm run build" WorkingDirectory="Client" />
+  </Target>
+
+  <!-- Copy the manifest from Client/public into wwwroot for BOTH Build and Pack -->
+  <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Build;Pack" DependsOnTargets="BuildClient_OnBuild;BuildClient">
     <Message Importance="high" Text="Copying umbraco-package.json into wwwroot/App_Plugins..." />
     <Copy
       SourceFiles="Client\public\umbraco-package.json"
@@ -139,8 +151,8 @@
       OverWriteReadOnlyFiles="true" />
   </Target>
 
-  <!-- Validate the copied manifest has 'extensions' to prevent regressions -->
-  <Target Name="ValidateUmbracoManifest" BeforeTargets="Pack" DependsOnTargets="CopyUmbracoPackageManifest">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$m=Get-Content -Raw 'wwwroot\App_Plugins\Tollervey.Umbraco.LightningPayments\umbraco-package.json' | ConvertFrom-Json; if($null -eq $m.extensions){ Write-Error 'umbraco-package.json missing required property: extensions'; exit 1 }&quot;" />
+  <!-- Validate the copied manifest for BOTH Build and Pack -->
+  <Target Name="ValidateUmbracoManifest" BeforeTargets="Build;Pack" DependsOnTargets="CopyUmbracoPackageManifest">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$m=Get-Content -Raw 'wwwroot\App_Plugins\Tollervey.Umbraco.LightningPayments\umbraco-package.json' | ConvertFrom-Json; if($null -eq $m.extensions -or $m.allowTelemetry -ne $true){ Write-Error 'umbraco-package.json must contain an extensions array and allowTelemetry:true'; exit 1 }&quot;" />
   </Target>
 </Project>
