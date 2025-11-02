@@ -5,7 +5,7 @@
     {
       "type": "entryPoint",
       "name": "Minimal Test Entry Point",
-      "js": "/_content/Tollervey.Umbraco.LightningPayments/App_Plugins/Tollervey.Umbraco.LightningPayments/minimal-test.js"
+      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/minimal-test.js"
     }
   ]
 }

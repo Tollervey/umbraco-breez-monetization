@@ -13,6 +13,9 @@
     <!-- Enable .NET analyzers and use the latest analysis level. Do not treat warnings as errors here to avoid breaking consumers; CI can enable that. -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
+
+    <!-- Serve static web assets at the web root so Umbraco can discover /App_Plugins manifests -->
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
   </PropertyGroup>
 
   <PropertyGroup>
