@@ -13,6 +13,8 @@ using Umbraco.Cms.Web.Common.Authorization;
 using Umbraco.Extensions;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Linq;
+using Microsoft.AspNetCore.Hosting;
+using System.IO;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
@@ -29,6 +31,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         private readonly ILightningPaymentsRuntimeMode _runtimeMode;
         private readonly IBreezPaymentsFacade _paymentsFacade;
         private readonly IInvoiceHelper _invoiceHelper;
+        private readonly IWebHostEnvironment _hostEnv;
 
         private IActionResult Error(int statusCode, string error, string message) => StatusCode(statusCode, new ApiError { error = error, message = message });
 
@@ -39,7 +42,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         IUserService userService,
         ILightningPaymentsRuntimeMode runtimeMode,
         IBreezPaymentsFacade paymentsFacade,
-        IInvoiceHelper invoiceHelper)
+        IInvoiceHelper invoiceHelper,
+        IWebHostEnvironment hostEnv)
         {
             _breezSdkService = breezSdkService;
             _paymentStateService = paymentStateService;
@@ -48,6 +52,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             _runtimeMode = runtimeMode;
             _paymentsFacade = paymentsFacade;
             _invoiceHelper = invoiceHelper;
+            _hostEnv = hostEnv;
         }
 
         // Helper to handle idempotency header lookup and short-circuit when a previous mapping exists.
@@ -397,6 +402,68 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
             }
             catch (InvalidInvoiceRequestException ex) { _logger.LogWarning(ex, "Invalid request for fee quote."); return Error(StatusCodes.Status400BadRequest, "invalid_request", ex.Message); }
             catch (Exception ex) { _logger.LogError(ex, "Error fetching receive fee quote for contentId {ContentId}", contentId); return Error(StatusCodes.Status500InternalServerError, "server_error", "An error occurred while fetching the fee quote."); }
+        }
+
+        /// <summary>
+        /// Diagnostic endpoint for admin to check plugin assets.
+        /// </summary>
+        [HttpGet("Diagnostics/Assets")]
+        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+        [Authorize(Policy = AuthorizationPolicies.RequireAdminAccess)]
+        public IActionResult DiagnosticsAssets()
+        {
+            const string pluginDir = "App_Plugins/Tollervey.Umbraco.LightningPayments";
+            var fp = _hostEnv.WebRootFileProvider;
+
+            var probe = new []
+            {
+                $"{pluginDir}/umbraco-package.json",
+                $"{pluginDir}/lightning-ui.js"
+            }
+            .Select(p =>
+            {
+                var fi = fp.GetFileInfo(p);
+                return new
+                {
+                    path = "/" + p.Replace('\\','/'),
+                    exists = fi.Exists,
+                    length = fi.Exists ? (long?)fi.Length : null
+                };
+            })
+            .ToArray();
+
+            var listing = fp.GetDirectoryContents(pluginDir);
+            var files = listing.Exists
+                ? listing.Where(f => !f.IsDirectory)
+                         .Select(f => new { f.Name, f.Length })
+                         .OrderBy(f => f.Name)
+                         .ToArray()
+                : Array.Empty<object>();
+
+            // Try read first 256 bytes of manifest to confirm content
+            string? manifestHead = null;
+            try
+            {
+                var mf = fp.GetFileInfo($"{pluginDir}/umbraco-package.json");
+                if (mf.Exists)
+                {
+                    using var s = mf.CreateReadStream();
+                    using var r = new StreamReader(s, leaveOpen:false);
+                    var buf = new char[Math.Min(256, (int)mf.Length)];
+                    var n = r.ReadBlock(buf, 0, buf.Length);
+                    manifestHead = new string(buf, 0, n);
+                }
+            }
+            catch { /* ignore */ }
+
+            return Ok(new
+            {
+                webRootPath = _hostEnv.WebRootPath,
+                probes = probe,
+                directory = "/" + pluginDir,
+                files,
+                manifestPreview = manifestHead
+            });
         }
     }
 

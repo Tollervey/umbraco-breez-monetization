@@ -45,6 +45,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 
             // Ensure BreezSdkService is tied to Umbraco app lifecycle
             builder.Components().Append<BreezSdkComponent>();
+            builder.Components().Append<PackageDiagnosticsComponent>(); // add this line
 
             // Swagger is intentionally not registered here to avoid forcing a transitive dependency.
             // Consumers can add Swagger in their host application if desired.
