@@ -414,10 +414,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         {
             var fp = _hostEnv.WebRootFileProvider;
             var assemblyName = typeof(LightningPaymentsApiController).Assembly.GetName().Name!;
+            var packageId = "Tollervey.Umbraco.LightningPayments"; // matches your <PackageId> in the .csproj
+
             var locations = new[]
             {
-                new { label = "site-wwwroot", basePath = "App_Plugins/Tollervey.Umbraco.LightningPayments" },
-                new { label = "static-web-assets", basePath = $"_content/{assemblyName}/App_Plugins/Tollervey.Umbraco.LightningPayments" }
+                new { label = "site-wwwroot",      basePath = "App_Plugins/Tollervey.Umbraco.LightningPayments" },
+                new { label = "static-web-assets:assembly", basePath = $"_content/{assemblyName}/App_Plugins/Tollervey.Umbraco.LightningPayments" },
+                new { label = "static-web-assets:package",  basePath = $"_content/{packageId}/App_Plugins/Tollervey.Umbraco.LightningPayments" }
             };
 
             var results = locations.Select(loc =>
