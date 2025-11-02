@@ -12,6 +12,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using System;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Tollervey.Umbraco.LightningPayments.UI.Infrastructure;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -69,8 +72,25 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddDbContext<PaymentDbContext>((sp, options) =>
             {
                 var settings = sp.GetRequiredService<IOptions<LightningPaymentsSettings>>().Value;
-                options.UseSqlite(settings.ConnectionString);
+                var env = sp.GetRequiredService<IHostEnvironment>();
+                var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments");
+
+                // Respect offline/in-memory mode at resolution time
+                var runtimeMode = sp.GetRequiredService<ILightningPaymentsRuntimeMode>();
+                var offlineOpts = sp.GetService<IOptions<OfflineLightningPaymentsOptions>>()?.Value;
+
+                if (runtimeMode.IsOffline && offlineOpts?.UseInMemoryStateService == true)
+                {
+                    options.UseInMemoryDatabase("LightningPayments_InMemory");
+                    logger.LogInformation("LightningPayments running in OFFLINE mode (in-memory). Skipping SQLite registration.");
+                    return;
+                }
+
+                // Normalize SQLite connection string
+                var resolved = ConnectionStringResolver.Resolve(settings.ConnectionString, env, logger);
+                options.UseSqlite(resolved);
             });
+
             builder.Services.AddScoped<IPaymentStateService, PersistentPaymentStateService>();
             // Email removed by default to simplify setup: no IEmailService registration.
 
@@ -81,7 +101,10 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddSingleton<BreezEventProcessor>();
             builder.Services.AddSingleton<IBreezEventProcessor>(sp => sp.GetRequiredService<BreezEventProcessor>());
             builder.Services.AddHostedService(sp => sp.GetRequiredService<BreezEventProcessor>());
+
+            // Keep initializer registration, but it will self-skip when running offline with in-memory state.
             builder.Services.AddHostedService<PaymentDbInitializer>();
+
             builder.Services.AddMemoryCache();
             builder.Services.AddScoped<IRuntimeSettingsService, RuntimeSettingsService>();
 

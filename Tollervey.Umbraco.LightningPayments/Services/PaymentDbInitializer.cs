@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Polly;
+using Tollervey.Umbraco.LightningPayments.UI.Configuration;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Services
 {
@@ -26,14 +28,27 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            // If offline and using in-memory state, skip DB initialization entirely.
+            using (var preScope = _sp.CreateScope())
+            {
+                var runtimeMode = preScope.ServiceProvider.GetService<ILightningPaymentsRuntimeMode>();
+                var offlineOpts = preScope.ServiceProvider.GetService<IOptions<OfflineLightningPaymentsOptions>>()?.Value;
+
+                if (runtimeMode?.IsOffline == true && offlineOpts?.UseInMemoryStateService == true)
+                {
+                    _logger.LogInformation("LightningPayments running in OFFLINE mode (in-memory). Skipping SQLite initialization.");
+                    return;
+                }
+            }
+
             // Retry policy for transient DB initialization failures
             var retryPolicy = Policy
-            .Handle<Exception>()
-            .WaitAndRetryAsync(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5) },
-            onRetry: (exception, timeSpan, retryCount, context) =>
-            {
-                _logger.LogWarning(exception, "Database initialization attempt {RetryCount} failed. Retrying in {Delay}s...", retryCount, timeSpan.TotalSeconds);
-            });
+                .Handle<Exception>()
+                .WaitAndRetryAsync(new[] { TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5) },
+                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.LogWarning(exception, "Database initialization attempt {RetryCount} failed. Retrying in {Delay}s...", retryCount, timeSpan.TotalSeconds);
+                    });
 
             try
             {
@@ -63,6 +78,21 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                         return;
                     }
 
+                    // Log the resolved SQLite DataSource path to aid diagnostics
+                    try
+                    {
+                        var connStr = ctx.Database.GetDbConnection().ConnectionString ?? string.Empty;
+                        var b = new SqliteConnectionStringBuilder(connStr);
+                        if (!string.IsNullOrWhiteSpace(b.DataSource))
+                        {
+                            _logger.LogDebug("LightningPayments SQLite DataSource path: {DataSource}", b.DataSource);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to parse SQLite connection string for logging.");
+                    }
+
                     _logger.LogInformation("Running SQLite schema adjustments (if required)...");
 
                     await EnsureColumnAsync(ctx, "PaymentStates", "AmountSat", "INTEGER NOT NULL DEFAULT0", ct);
@@ -79,8 +109,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
                         if (env?.IsProduction() == true && looksLikeFile)
                         {
                             _logger.LogCritical("Payment database is configured to use a SQLite file in Production (ConnectionString: {Conn}). This is not recommended for production workloads.\n" +
-             "Consider migrating to a managed database (e.g., Azure SQL, AWS RDS, or Azure Database for SQLite with persistent storage) and configure regular backups.\n" +
-             "If you must use SQLite, ensure the file is placed on a persistent, backed-up volume and that the process has exclusive write access. Back up with 'sqlite3 <db> .dump > backup.sql' or copy the file while the application is stopped.", connStr);
+                                                "Consider migrating to a managed database (e.g., Azure SQL, AWS RDS, or Azure Database for SQLite with persistent storage) and configure regular backups.\n" +
+                                                "If you must use SQLite, ensure the file is placed on a persistent, backed-up volume and that the process has exclusive write access. Back up with 'sqlite3 <db> .dump > backup.sql' or copy the file while the application is stopped.", connStr);
                         }
                     }
                     catch (Exception ex)
