@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using System.IO;
+using Microsoft.Extensions.FileProviders;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
@@ -414,7 +415,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         {
             var fp = _hostEnv.WebRootFileProvider;
             var assemblyName = typeof(LightningPaymentsApiController).Assembly.GetName().Name!;
-            var packageId = "Tollervey.Umbraco.LightningPayments"; // matches your <PackageId> in the .csproj
+            var packageId = "Tollervey.Umbraco.LightningPayments"; // This should match your <PackageId> in the .csproj
+
+            var providerInfo = new
+            {
+                type = fp.GetType().FullName,
+                inners = (fp as CompositeFileProvider)?.FileProviders.Select(p => p.GetType().FullName).ToArray()
+            };
 
             var locations = new[]
             {
@@ -430,6 +437,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                     {
                         var p = $"{loc.basePath}/{f}".Replace('\\','/');
                         var fi = fp.GetFileInfo(p);
+                        _logger.LogInformation("Asset probe ({Label}): Path='{Path}' Exists={Exists}", loc.label, p, fi.Exists);
                         return new { path = "/" + p, exists = fi.Exists, length = fi.Exists ? (long?)fi.Length : null };
                     }).ToArray();
 
@@ -456,7 +464,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
                 return new { loc.label, basePath = "/" + loc.basePath, probes, files, manifestPreview = manifestHead };
             });
 
-            return Ok(new { webRootPath = _hostEnv.WebRootPath, results });
+            return Ok(new { webRootPath = _hostEnv.WebRootPath, provider = providerInfo, results });
         }
     }
 
