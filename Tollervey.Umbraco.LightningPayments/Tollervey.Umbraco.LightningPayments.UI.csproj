@@ -82,8 +82,8 @@
     <Content Include="Client\src\tsconfig.node.json" />
     <Content Include="Client\tsconfig.json" />
 
-    <!-- However make the Umbraco-package.json included for dotnet pack or nuget package and visible to the solution -->
-    <Content Include="Client\public\umbraco-package.json" Pack="true" PackagePath="App_Plugins\Tollervey.Umbraco.LightningPayments" />
+    <!-- REMOVE this line to avoid packing a second manifest -->
+    <!-- <Content Include="Client\public\umbraco-package.json" Pack="true" PackagePath="App_Plugins\Tollervey.Umbraco.LightningPayments" /> -->
   </ItemGroup>
 
   <!-- Include license, changelog and icon in the package -->
@@ -92,6 +92,7 @@
 	  <None Include="LICENSE" Pack="true" PackagePath="" />
 	  <None Include="README.md" Pack="true" PackagePath="" />
     <None Include="CHANGELOG.md" Pack="true" PackagePath="" />
+    <None Include="Tollervey.Umbraco.LightningPayments.csproj" />
   </ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
@@ -127,4 +128,17 @@
     <WriteLinesToFile File="$(IntermediateOutputPath)client.complete.txt" Lines="@(_ClientAssetsBuildOutput)" Overwrite="true" />
   </Target>
 
+  <!-- Copy the manifest from Client/public into wwwroot just before packing (after client build) -->
+  <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Pack" DependsOnTargets="BuildClient">
+    <Message Importance="high" Text="Copying umbraco-package.json into wwwroot/App_Plugins..." />
+    <Copy
+      SourceFiles="Client\public\umbraco-package.json"
+      DestinationFiles="wwwroot\App_Plugins\Tollervey.Umbraco.LightningPayments\umbraco-package.json"
+      OverWriteReadOnlyFiles="true" />
+  </Target>
+
+  <!-- Validate the copied manifest has 'extensions' to prevent regressions -->
+  <Target Name="ValidateUmbracoManifest" BeforeTargets="Pack" DependsOnTargets="CopyUmbracoPackageManifest">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$m=Get-Content -Raw 'wwwroot\App_Plugins\Tollervey.Umbraco.LightningPayments\umbraco-package.json' | ConvertFrom-Json; if($null -eq $m.extensions){ Write-Error 'umbraco-package.json missing required property: extensions'; exit 1 }&quot;" />
+  </Target>
 </Project>
