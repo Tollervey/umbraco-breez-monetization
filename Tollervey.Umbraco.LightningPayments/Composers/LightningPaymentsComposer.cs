@@ -22,6 +22,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
         /// </summary>
         public void Compose(IUmbracoBuilder builder)
         {
+            // Restore the original service registrations
+            builder.AddLightningPayments();
+
             // Register services, options, health checks, etc.
             builder.Components().Append<MinimalTestComponent>();
         }
