@@ -1,11 +1,14 @@
 {
-  "name": "Lightning Payments (Minimal Test)",
+  "id": "Tollervey.Umbraco.LightningPayments",
+  "name": "Lightning Payments",
   "version": "99.0.0",
+  "allowTelemetry": true,
   "extensions": [
     {
-      "type": "entryPoint",
-      "name": "Minimal Test Entry Point",
-      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/minimal-test.js"
+      "name": "Lightning Payments Bundle",
+      "alias": "Tollervey.Umbraco.LightningPayments.Bundle",
+      "type": "bundle",
+      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
     }
   ]
 }
