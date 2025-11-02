@@ -1,13 +1,16 @@
-export const manifests: Array<any> = [
- {
- type: 'dashboard',
- alias: 'lightning-payments-dashboard',
- name: 'Lightning Payments Dashboard',
- elementName: 'lightning-payments-dashboard',
- js: () => import('./dashboard.element.js'),
- meta: {
- label: 'Lightning Payments',
- pathname: 'lightning-payments'
- }
- }
+export const manifests = [
+    {
+        type: 'dashboard',
+        alias: 'Tollervey.LightningPayments.Dashboard',
+        name: 'Lightning Payments Dashboard',
+        element: 'lightning-payments-dashboard',
+        loader: () => import('./dashboard.element.js'),
+        weight: 10,
+        meta: {
+            label: 'Lightning Payments',
+            pathname: 'lightning-payments',
+            icon: 'icon-thunder'
+        },
+        conditions: [{ alias: 'Umb.Condition.SectionAlias', value: 'settings' }]
+    }
 ];

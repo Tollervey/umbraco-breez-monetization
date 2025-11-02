@@ -1,17 +1,9 @@
 const e = [
   {
-    type: "dashboard",
-    alias: "Tollervey.LightningPayments.Setup",
-    name: "Lightning Payments Setup",
-    element: "umb-lp-setup-dashboard",
-    loader: () => import("./lightning-setup-dashboard.element-CeVcCqQA.js"),
-    weight: 10,
-    meta: {
-      label: "Lightning Payments Setup",
-      pathname: "lightning-payments-setup",
-      icon: "icon-thunder"
-    },
-    conditions: [{ alias: "Umb.Condition.SectionAlias", value: "settings" }]
+    type: "entryPoint",
+    alias: "Tollervey.Umbraco.LightningPayments.Entrypoint",
+    name: "Lightning Payments Entrypoint",
+    js: () => import("./entrypoint-BqzT7OLN.js")
   }
 ], a = [
   // Paywall property editor UI
@@ -74,14 +66,17 @@ const e = [
 ], t = [
   {
     type: "dashboard",
-    alias: "lightning-payments-dashboard",
+    alias: "Tollervey.LightningPayments.Dashboard",
     name: "Lightning Payments Dashboard",
-    elementName: "lightning-payments-dashboard",
-    js: () => import("./dashboard.element-A9sSLIGC.js"),
+    element: "lightning-payments-dashboard",
+    loader: () => import("./dashboard.element-A9sSLIGC.js"),
+    weight: 10,
     meta: {
       label: "Lightning Payments",
-      pathname: "lightning-payments"
-    }
+      pathname: "lightning-payments",
+      icon: "icon-thunder"
+    },
+    conditions: [{ alias: "Umb.Condition.SectionAlias", value: "settings" }]
   }
 ], i = [
   ...e,

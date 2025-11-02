@@ -8,7 +8,7 @@
       "alias": "Tollervey.Umbraco.LightningPayments.Entrypoint",
       "name": "Lightning Payments Entrypoint",
       "js": [
-        "lightning-ui.js"
+        "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
       ]
     }
   ]
