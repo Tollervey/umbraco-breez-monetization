@@ -12,12 +12,9 @@ public class PackageDiagnosticsComponent : IComponent
     private readonly ILogger<PackageDiagnosticsComponent> _logger;
     private readonly IWebHostEnvironment _env;
 
-    private const string PluginDir = "App_Plugins/Tollervey.Umbraco.LightningPayments";
-    private static readonly string[] ProbeFiles =
-    [
-        $"{PluginDir}/umbraco-package.json",
-        $"{PluginDir}/lightning-ui.js"
-    ];
+    private const string PackageFolderName = "Tollervey.Umbraco.LightningPayments";
+    private const string PluginDirRelative = $"App_Plugins/{PackageFolderName}";
+    private static readonly string[] ProbeFiles = ["umbraco-package.json", "lightning-ui.js"];
 
     public PackageDiagnosticsComponent(ILogger<PackageDiagnosticsComponent> logger, IWebHostEnvironment env)
     {
@@ -29,32 +26,16 @@ public class PackageDiagnosticsComponent : IComponent
     {
         try
         {
-            var fp = _env.WebRootFileProvider;
             _logger.LogInformation("LightningPayments diagnostics: WebRootPath={WebRootPath}", _env.WebRootPath ?? "(null)");
+            var fp = _env.WebRootFileProvider;
 
-            foreach (var relPath in ProbeFiles)
-            {
-                var fi = fp.GetFileInfo(relPath);
-                _logger.LogInformation("Asset probe: {Path} Exists={Exists} Length={Length}",
-                    "/" + relPath.Replace('\\','/'), fi.Exists, fi.Exists ? fi.Length : 0);
-            }
+            // Probe physical /App_Plugins (when assets copied to site)
+            ProbeLocation(fp, PluginDirRelative, "site-wwwroot");
 
-            // List top-level files in the plugin directory (useful to verify hashed chunks are there)
-            IDirectoryContents dir = fp.GetDirectoryContents(PluginDir);
-            if (dir.Exists)
-            {
-                var files = dir.Where(f => !f.IsDirectory)
-                               .Select(f => new { f.Name, f.Length })
-                               .OrderBy(f => f.Name)
-                               .Take(50) // keep logging concise
-                               .ToArray();
-                _logger.LogInformation("Asset listing for /{PluginDir} ({Count} items, showing up to 50): {Files}",
-                    PluginDir, files.Length, string.Join(", ", files.Select(f => $"{f.Name}({f.Length}b)")));
-            }
-            else
-            {
-                _logger.LogWarning("Directory probe failed: /{PluginDir} not found via WebRootFileProvider.", PluginDir);
-            }
+            // Probe RCL static web assets path /_content/{Assembly}/App_Plugins/...
+            var assemblyName = typeof(PackageDiagnosticsComponent).Assembly.GetName().Name!;
+            var rclBase = $"_content/{assemblyName}/{PluginDirRelative}";
+            ProbeLocation(fp, rclBase, "static-web-assets");
         }
         catch (Exception ex)
         {
@@ -62,8 +43,32 @@ public class PackageDiagnosticsComponent : IComponent
         }
     }
 
-    public void Terminate()
+    private void ProbeLocation(IFileProvider fp, string basePath, string label)
     {
-        // no-op
+        foreach (var f in ProbeFiles)
+        {
+            var path = $"{basePath}/{f}".Replace('\\', '/');
+            var fi = fp.GetFileInfo(path);
+            _logger.LogInformation("Asset probe ({Label}): /{Path} Exists={Exists} Length={Length}",
+                label, path, fi.Exists, fi.Exists ? fi.Length : 0);
+        }
+
+        IDirectoryContents dir = fp.GetDirectoryContents(basePath);
+        if (dir.Exists)
+        {
+            var files = dir.Where(i => !i.IsDirectory)
+                           .Select(i => $"{i.Name}({i.Length}b)")
+                           .OrderBy(n => n)
+                           .ToArray();
+            _logger.LogInformation("Asset listing ({Label}) for /{BasePath} ({Count} items, showing up to 50): {Files}",
+                label, basePath, files.Length, string.Join(", ", files.Take(50)));
+        }
+        else
+        {
+            _logger.LogWarning("Directory probe ({Label}) failed: /{BasePath} not found via WebRootFileProvider.",
+                label, basePath);
+        }
     }
+
+    public void Terminate() { }
 }

@@ -412,58 +412,48 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
         [Authorize(Policy = AuthorizationPolicies.RequireAdminAccess)]
         public IActionResult DiagnosticsAssets()
         {
-            const string pluginDir = "App_Plugins/Tollervey.Umbraco.LightningPayments";
             var fp = _hostEnv.WebRootFileProvider;
+            var assemblyName = typeof(LightningPaymentsApiController).Assembly.GetName().Name!;
+            var locations = new[]
+            {
+                new { label = "site-wwwroot", basePath = "App_Plugins/Tollervey.Umbraco.LightningPayments" },
+                new { label = "static-web-assets", basePath = $"_content/{assemblyName}/App_Plugins/Tollervey.Umbraco.LightningPayments" }
+            };
 
-            var probe = new []
+            var results = locations.Select(loc =>
             {
-                $"{pluginDir}/umbraco-package.json",
-                $"{pluginDir}/lightning-ui.js"
-            }
-            .Select(p =>
-            {
-                var fi = fp.GetFileInfo(p);
-                return new
+                var probes = new[] { "umbraco-package.json", "lightning-ui.js" }
+                    .Select(f =>
+                    {
+                        var p = $"{loc.basePath}/{f}".Replace('\\','/');
+                        var fi = fp.GetFileInfo(p);
+                        return new { path = "/" + p, exists = fi.Exists, length = fi.Exists ? (long?)fi.Length : null };
+                    }).ToArray();
+
+                var listing = fp.GetDirectoryContents(loc.basePath);
+                var files = listing.Exists
+                    ? listing.Where(i => !i.IsDirectory).Select(i => new { i.Name, i.Length }).OrderBy(i => i.Name).ToArray()
+                    : Array.Empty<object>();
+
+                string? manifestHead = null;
+                try
                 {
-                    path = "/" + p.Replace('\\','/'),
-                    exists = fi.Exists,
-                    length = fi.Exists ? (long?)fi.Length : null
-                };
-            })
-            .ToArray();
-
-            var listing = fp.GetDirectoryContents(pluginDir);
-            var files = listing.Exists
-                ? listing.Where(f => !f.IsDirectory)
-                         .Select(f => new { f.Name, f.Length })
-                         .OrderBy(f => f.Name)
-                         .ToArray()
-                : Array.Empty<object>();
-
-            // Try read first 256 bytes of manifest to confirm content
-            string? manifestHead = null;
-            try
-            {
-                var mf = fp.GetFileInfo($"{pluginDir}/umbraco-package.json");
-                if (mf.Exists)
-                {
-                    using var s = mf.CreateReadStream();
-                    using var r = new StreamReader(s, leaveOpen:false);
-                    var buf = new char[Math.Min(256, (int)mf.Length)];
-                    var n = r.ReadBlock(buf, 0, buf.Length);
-                    manifestHead = new string(buf, 0, n);
+                    var mf = fp.GetFileInfo($"{loc.basePath}/umbraco-package.json");
+                    if (mf.Exists)
+                    {
+                        using var s = mf.CreateReadStream();
+                        using var r = new StreamReader(s);
+                        var buf = new char[Math.Min(256, (int)mf.Length)];
+                        var n = r.ReadBlock(buf, 0, buf.Length);
+                        manifestHead = new string(buf, 0, n);
+                    }
                 }
-            }
-            catch { /* ignore */ }
+                catch { /* ignore */ }
 
-            return Ok(new
-            {
-                webRootPath = _hostEnv.WebRootPath,
-                probes = probe,
-                directory = "/" + pluginDir,
-                files,
-                manifestPreview = manifestHead
+                return new { loc.label, basePath = "/" + loc.basePath, probes, files, manifestPreview = manifestHead };
             });
+
+            return Ok(new { webRootPath = _hostEnv.WebRootPath, results });
         }
     }
 
