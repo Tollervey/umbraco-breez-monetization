@@ -8,6 +8,7 @@ using Umbraco.Cms.Web.Common.ApplicationBuilder;
 using Tollervey.Umbraco.LightningPayments.UI.Components;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Composers
 {
@@ -22,11 +23,13 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Composers
         /// </summary>
         public void Compose(IUmbracoBuilder builder)
         {
-            // Restore the original service registrations
-            builder.AddLightningPayments();
+            var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments.Startup");
+            logger.LogInformation("--- Step 3: LightningPaymentsComposer.Compose() called. ---");
 
-            // Register services, options, health checks, etc.
+            // We are still using the minimal test component for this diagnostic.
             builder.Components().Append<MinimalTestComponent>();
+
+            logger.LogInformation("--- Step 4: MinimalTestComponent appended. ---");
         }
     }
 }

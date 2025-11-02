@@ -25,6 +25,10 @@ namespace Microsoft.Extensions.DependencyInjection
     {
         public static IUmbracoBuilder AddLightningPayments(this IUmbracoBuilder builder)
         {
+            // STEP 1: This is the first log. If you don't see this, the consuming app is not calling this method.
+            var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments.Startup");
+            logger.LogInformation("--- Step 1: AddLightningPayments() called. Assembly is now loaded. ---");
+
             // Bind the "LightningPayments" section of appsettings to the settings model
             builder.Services.AddOptions<LightningPaymentsSettings>()
                 .Bind(builder.Config.GetSection(LightningPaymentsSettings.SectionName))
@@ -73,7 +77,7 @@ namespace Microsoft.Extensions.DependencyInjection
             {
                 var settings = sp.GetRequiredService<IOptions<LightningPaymentsSettings>>().Value;
                 var env = sp.GetRequiredService<IHostEnvironment>();
-                var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments");
+                var dbLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments");
 
                 // Respect offline/in-memory mode at resolution time
                 var runtimeMode = sp.GetRequiredService<ILightningPaymentsRuntimeMode>();
@@ -82,12 +86,12 @@ namespace Microsoft.Extensions.DependencyInjection
                 if (runtimeMode.IsOffline && offlineOpts?.UseInMemoryStateService == true)
                 {
                     options.UseInMemoryDatabase("LightningPayments_InMemory");
-                    logger.LogInformation("LightningPayments running in OFFLINE mode (in-memory). Skipping SQLite registration.");
+                    dbLogger.LogInformation("LightningPayments running in OFFLINE mode (in-memory). Skipping SQLite registration.");
                     return;
                 }
 
                 // Normalize SQLite connection string
-                var resolved = ConnectionStringResolver.Resolve(settings.ConnectionString, env, logger);
+                var resolved = ConnectionStringResolver.Resolve(settings.ConnectionString, env, dbLogger);
                 options.UseSqlite(resolved);
             });
 
@@ -113,6 +117,8 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddScoped<IInvoiceHelper, InvoiceHelper>();
 
             builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
+
+            logger.LogInformation("--- Step 2: AddLightningPayments() completed service registration. ---");
 
             return builder;
         }
