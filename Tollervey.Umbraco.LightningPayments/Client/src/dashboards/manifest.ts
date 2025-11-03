@@ -23,7 +23,7 @@ export const manifests = [
         alias: 'Tollervey.LightningPayments.Dashboard',
         name: 'Lightning Payments Dashboard',
         element: 'lightning-payments-dashboard',
-        loader: () => import('./dashboard.element.js'),
+        loader: () => import('./dashboard.element'),
         weight: 10,
         meta: {
             label: 'Lightning Payments',

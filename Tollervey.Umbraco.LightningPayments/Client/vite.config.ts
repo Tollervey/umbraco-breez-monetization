@@ -11,9 +11,14 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [/^@umbraco-cms\//],
+      output: {
+        entryFileNames: `lightning-ui.js`,
+        chunkFileNames: `bundle.manifests.js`,   // <- fixed name, no hash
+        assetFileNames: `[name][extname]`,
+      },
     },
     sourcemap: true,
     outDir: resolve(__dirname, "../wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments"),
-    emptyOutDir: false,
+    emptyOutDir: true, // <- clean folder to avoid mismatches
   },
 });
