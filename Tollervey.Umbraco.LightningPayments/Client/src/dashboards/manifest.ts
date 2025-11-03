@@ -30,6 +30,7 @@ export const manifests = [
             pathname: 'lightning-payments',
             icon: 'icon-thunder'
         },
-        conditions: [{ alias: 'Umb.Condition.SectionAlias', value: 'Tollervey.LightningPayments.Section' }]
+        // Bind this dashboard to the custom workspace so the Dashboard view can discover it
+        conditions: [{ alias: 'Umb.Condition.WorkspaceAlias', value: 'Tollervey.LightningPayments.Workspace' }]
     }    
 ];
