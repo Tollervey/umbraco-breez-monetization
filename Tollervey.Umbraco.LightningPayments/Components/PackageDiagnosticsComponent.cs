@@ -90,7 +90,7 @@ public class PackageDiagnosticsComponent : IComponent
 
         // Try extract referenced bundle file name from the small ES module wrapper
         // Example: import { a as e } from "./bundle.manifests-XYZ.js"; export { e as manifests };
-        var m = Regex.Match(uiContent ?? string.Empty, "bundle\\.manifests-[A-Za-z0-9_]+\\.js");
+        var m = Regex.Match(uiContent ?? string.Empty, "bundle\\.manifests(?:-[A-Za-z0-9_]+)?\\.js");
         if (!m.Success)
         {
             _logger.LogWarning("Bundle analysis: could not locate referenced bundle.manifests-*.js in lightning-ui.js");
