@@ -130,6 +130,15 @@ public class PackageDiagnosticsComponent : IComponent
         {
             _logger.LogWarning("Bundle analysis: Could not find dashboard SectionAlias condition in bundle head chunk.");
         }
+
+        // Added: Detailed manifest detection logging
+        _logger.LogInformation("Bundle analysis detail: Raw head snippet (first 500 chars): {Snippet}", Truncate(bundleHead, 500));
+        _logger.LogInformation("Bundle analysis detail: Detected custom section: {Detected}", bundleHead.Contains("\"alias\": \"Tollervey.LightningPayments.Section\""));
+        _logger.LogInformation("Bundle analysis detail: Detected workspace: {Detected}", bundleHead.Contains("\"alias\": \"Tollervey.LightningPayments.Workspace\""));
+        _logger.LogInformation("Bundle analysis detail: Detected workspace view: {Detected}", bundleHead.Contains("\"alias\": \"Tollervey.LightningPayments.WorkspaceView.Main\""));
+        _logger.LogInformation("Bundle analysis detail: Detected dashboard: {Detected}", bundleHead.Contains("\"alias\": \"Tollervey.LightningPayments.Dashboard\""));
+        _logger.LogInformation("Bundle analysis detail: Custom element reference: {Detected}", bundleHead.Contains("elementName: 'lightning-payments-dashboard'"));
+        _logger.LogInformation("Bundle analysis detail: Loader import: {Detected}", bundleHead.Contains("import('./dashboard.element')"));
     }
 
     private static string ReadFirstBytes(IFileInfo fi, int maxBytes)
