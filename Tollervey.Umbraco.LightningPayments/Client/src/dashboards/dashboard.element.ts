@@ -8,6 +8,8 @@ import {
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import * as QRCode from "qrcode";
 
+const dbg = (...args: any[]) => console.info('[LightningPayments][Dashboard]', ...args);
+
 interface Payment {
   paymentHash: string;
   contentId: number;
@@ -63,20 +65,25 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
 
   // realtime event log
   private _evtSrc?: EventSource;
-  @state() private eventLog: Array<{ time: string; type: string; details: string }>= [];
+  @state() private eventLog: Array<{ time: string; type: string; details: string }> = [];
+  private _loggedFirstRender = false;
 
   constructor() {
     super();
+    dbg('constructed');
+    (window as any).__LP_DEBUG__ = this; // expose instance for quick DevTools checks
     this.loadAll();
   }
 
   connectedCallback(): void {
     super.connectedCallback();
+    dbg('connectedCallback');
     if (this.autoRefresh) this.startAutoRefresh();
     this.connectRealtime();
   }
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    dbg('disconnectedCallback');
     this.stopAutoRefresh();
     this._evtSrc?.close();
     this._evtSrc = undefined;
@@ -84,101 +91,109 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
 
   private connectRealtime() {
     try {
+      dbg('SSE connect', '/api/public/lightning/realtime/subscribe');
       this._evtSrc?.close();
       this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
-      this._evtSrc.addEventListener('payment-succeeded', async () => {
-        // new payment, refresh table fast
-        await this.loadPayments();
-      });
+      this._evtSrc.addEventListener('open', () => dbg('SSE open'));
+      this._evtSrc.onerror = (e: any) => dbg('SSE error', e);
+      this._evtSrc.addEventListener('payment-succeeded', async () => { dbg('SSE payment-succeeded'); await this.loadPayments(); });
       this._evtSrc.addEventListener('breez-event', (ev: MessageEvent) => {
         try {
           const data = JSON.parse(ev.data);
-          const entry = {
-            time: new Date().toLocaleTimeString(),
-            type: String(data?.type ?? 'Unknown'),
-            details: String(data?.details ?? '')
-          };
+          const entry = { time: new Date().toLocaleTimeString(), type: String(data?.type ?? 'Unknown'), details: String(data?.details ?? '') };
           const max =50;
           this.eventLog = [entry, ...this.eventLog].slice(0, max);
-        } catch { /* ignore */ }
+        } catch (err) { dbg('SSE breez-event parse error', err); }
       });
-      this._evtSrc.onerror = () => { /* browser retries automatically */ };
-    } catch { /* ignore */ }
+    } catch (err) { dbg('connectRealtime failed', err); }
   }
 
   private async loadAll() {
-    await Promise.all([
-      this.loadStatus(),
-      this.loadLimits(),
-      this.loadRecommendedFees(),
-      this.loadHealth(),
-      this.loadPayments(),
-    ]);
+    dbg('loadAll:start');
+    try {
+      await Promise.all([
+        this.loadStatus(),
+        this.loadLimits(),
+        this.loadRecommendedFees(),
+        this.loadHealth(),
+        this.loadPayments(),
+      ]);
+      dbg('loadAll:done');
+    } catch (err) { dbg('loadAll:error', err); }
   }
 
   private async loadStatus() {
     this.loadingStatus = true;
     this.errorStatus = "";
     try {
-      const res = await fetch(
-        "/umbraco/management/api/lightningpayments/GetStatus"
-      );
+      const url = "/umbraco/management/api/lightningpayments/GetStatus";
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       this.connected = !!data.connected;
       this.offlineMode = !!data.offlineMode;
     } catch (err: any) {
       this.errorStatus = err?.message ?? "Failed to load status";
+      dbg('GET error /GetStatus', this.errorStatus);
     } finally {
       this.loadingStatus = false;
     }
   }
 
   private async loadLimits() {
+    const url = "/umbraco/management/api/lightningpayments/GetLightningReceiveLimits";
     try {
-      const res = await fetch(
-        "/umbraco/management/api/lightningpayments/GetLightningReceiveLimits"
-      );
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
       if (!res.ok) return;
       const data = await res.json();
       this.minSat = typeof data.minSat === "number" ? data.minSat : null;
       this.maxSat = typeof data.maxSat === "number" ? data.maxSat : null;
-    } catch {}
+    } catch (err) { dbg('GET error /GetLightningReceiveLimits', err); }
   }
 
   private async loadRecommendedFees() {
+    const url = "/umbraco/management/api/lightningpayments/GetRecommendedFees";
     try {
-      const res = await fetch(
-        "/umbraco/management/api/lightningpayments/GetRecommendedFees"
-      );
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
       if (!res.ok) return;
       this.recommendedFees = await res.json();
-    } catch {}
+    } catch (err) { dbg('GET error /GetRecommendedFees', err); }
   }
 
   private async loadHealth() {
+    const url = "/health/ready";
     try {
-      const res = await fetch("/health/ready");
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
       if (!res.ok) { this.health = { status: `HTTP ${res.status}` }; return; }
       const txt = await res.text();
-      // Minimal surface: treat any OK body as healthy.
       this.health = { status: "Healthy", description: txt?.substring(0,120) };
     } catch (e: any) {
       this.health = { status: "Unknown", description: e?.message };
+      dbg('GET error /health/ready', e);
     }
   }
 
   async loadPayments() {
+    const url = "/umbraco/management/api/lightningpayments/GetAllPayments";
     try {
-      const response = await fetch(
-        "/umbraco/management/api/lightningpayments/GetAllPayments"
-      );
+      dbg('GET', url);
+      const response = await fetch(url);
+      dbg('GET result', url, response.status);
       if (response.ok) {
         this.payments = await response.json();
         this.filteredPayments = this.payments;
+        dbg('payments loaded', this.payments.length);
       }
     } catch (error) {
-      console.error("Failed to load payments:", error);
+      dbg('GET error /GetAllPayments', error);
     }
   }
 
@@ -196,20 +211,21 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     this.createdInvoice = null;
     this.createdPaymentHash = null;
     this.invoiceQrDataUrl = null;
+    const url = "/umbraco/management/api/lightningpayments/CreateTestInvoice";
     try {
-      const res = await fetch(
-        "/umbraco/management/api/lightningpayments/CreateTestInvoice",
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountSat: this.testAmount, description: this.testDescription }) }
-      );
+      dbg('POST', url, { amountSat: this.testAmount, description: this.testDescription });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountSat: this.testAmount, description: this.testDescription }) });
+      dbg('POST result', url, res.status);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       this.createdInvoice = data.invoice;
       this.createdPaymentHash = data.paymentHash;
       if (this.createdInvoice) {
-        try { this.invoiceQrDataUrl = await QRCode.toDataURL(this.createdInvoice, { width:240, margin:1 }); } catch (qrErr) { console.error("QR generation failed", qrErr); }
+        try { this.invoiceQrDataUrl = await QRCode.toDataURL(this.createdInvoice, { width:240, margin:1 }); } catch (qrErr) { dbg('QR generation failed', qrErr); }
       }
     } catch (err: any) {
       this.invoiceError = err?.message ?? "Failed to create invoice";
+      dbg('POST error /CreateTestInvoice', this.invoiceError);
     } finally {
       this.creatingInvoice = false;
     }
@@ -221,12 +237,15 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
     this.quoteResult = null;
     try {
       const url = new URL("/umbraco/management/api/lightningpayments/GetPaywallReceiveFeeQuote", location.origin);
-      url.searchParams.set("contentId", String(0)); // contentId not used for generic quote; server will validate
+      url.searchParams.set("contentId", String(0));
+      dbg('GET', url.toString());
       const res = await fetch(url.toString());
+      dbg('GET result', '/umbraco/management/api/lightningpayments/GetPaywallReceiveFeeQuote', res.status);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       this.quoteResult = await res.json();
     } catch (err: any) {
       this.quoteError = err?.message ?? "Failed to get quote";
+      dbg('GET error /GetPaywallReceiveFeeQuote', this.quoteError);
     } finally {
       this.quoting = false;
     }
@@ -234,12 +253,29 @@ export class LightningPaymentsDashboardElement extends UmbElementMixin(LitElemen
 
   private onRefreshClick = async () => { this.refreshing = true; try { await this.loadAll(); } finally { this.refreshing = false; } };
   private toggleAutoRefresh = (e: Event) => { const checked = (e.target as HTMLInputElement).checked; this.autoRefresh = checked; if (checked) this.startAutoRefresh(); else this.stopAutoRefresh(); };
-  private startAutoRefresh() { this.stopAutoRefresh(); this.refreshTimer = window.setInterval(() => this.loadAll(), this.refreshIntervalMs); }
-  private stopAutoRefresh() { if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; } }
-  private async copyInvoice() { if (!this.createdInvoice) return; try { await navigator.clipboard.writeText(this.createdInvoice); this.copyOk = true; setTimeout(() => (this.copyOk = false),1500); } catch (err) { console.warn("Copy failed", err); } }
-  private async sendRowAction(endpoint: string, paymentHash: string) { this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: true }; this.rowActionError = { ...this.rowActionError, [paymentHash]: "" }; try { const res = await fetch(`/umbraco/management/api/lightningpayments/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentHash }) }); if (!res.ok) throw new Error(`HTTP ${res.status}`); await this.loadPayments(); } catch (err: any) { this.rowActionError = { ...this.rowActionError, [paymentHash]: err?.message ?? "Action failed" }; } finally { this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: false }; } }
+  private startAutoRefresh() { this.stopAutoRefresh(); dbg('autoRefresh:start'); this.refreshTimer = window.setInterval(() => this.loadAll(), this.refreshIntervalMs); }
+  private stopAutoRefresh() { if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; dbg('autoRefresh:stop'); } }
+  private async copyInvoice() { if (!this.createdInvoice) return; try { await navigator.clipboard.writeText(this.createdInvoice); this.copyOk = true; setTimeout(() => (this.copyOk = false),1500); } catch (err) { dbg('copy failed', err); } }
+  private async sendRowAction(endpoint: string, paymentHash: string) {
+    this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: true };
+    this.rowActionError = { ...this.rowActionError, [paymentHash]: "" };
+    try {
+      const url = `/umbraco/management/api/lightningpayments/${endpoint}`;
+      dbg('POST', url, { paymentHash });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentHash }) });
+      dbg('POST result', url, res.status);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.loadPayments();
+    } catch (err: any) {
+      this.rowActionError = { ...this.rowActionError, [paymentHash]: err?.message ?? "Action failed" };
+      dbg('POST error', endpoint, err);
+    } finally {
+      this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: false };
+    }
+  }
 
   render() {
+    if (!this._loggedFirstRender) { this._loggedFirstRender = true; dbg('render:first'); }
     return html`
       <umb-body-layout header-transparent>
         <div slot="header"><h2>Lightning Payments</h2></div>

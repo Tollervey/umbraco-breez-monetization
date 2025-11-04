@@ -15,7 +15,12 @@ export const manifests = [
         meta: {
             // entityType is arbitrary for a pure dashboard workspace
             entityType: 'lightning',
-            views: [{ alias: 'Umb.WorkspaceView.Dashboard', name: 'Dashboard', weight: 0 }]
+            views: [
+                // Built-in Dashboard view (discovers dashboards bound to this workspace)
+                { alias: 'Umb.WorkspaceView.Dashboard', name: 'Dashboard', weight: 0 },
+                // Fallback view that mounts our element directly so we can see logs even if discovery fails
+                { alias: 'Tollervey.LightningPayments.WorkspaceView.Main', name: 'Lightning UI', elementName: 'lightning-payments-dashboard', js: () => import('./dashboard.element'), weight: 1 }
+            ]
         }
     },
     {
