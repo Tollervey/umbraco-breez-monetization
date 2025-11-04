@@ -9,6 +9,14 @@ import { manifests as dashboardManifests } from '../dashboards/manifest';
 // load up the manifests here
 export const onInit: UmbEntryPointOnInit = (host, extensionRegistry) => {
     console.info('[LightningPayments] entrypoint onInit');
+    console.info('[LightningPayments] Checking if manifests are already registered...'); // Added: Log to detect duplicates
+
+    // Check for existing registrations to avoid duplicates
+    const existing = extensionRegistry.extensionsOfType('section').filter(e => e.alias.startsWith('Tollervey.LightningPayments'));
+    if (existing.length > 0) {
+        console.warn('[LightningPayments] Manifests already registered, skipping:', existing.map(e => e.alias));
+        return;
+    }
 
     const toRegister = [...dashboardManifests];
     console.info('[LightningPayments] manifests to register:', toRegister.map(m => `${m.type}:${m.alias}`));

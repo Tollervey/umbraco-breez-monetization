@@ -29,7 +29,7 @@ const dashboardManifests = [
     type: 'workspace',
     alias: 'Tollervey.LightningPayments.Workspace',
     name: 'Lightning Payments Workspace',
-    conditions: [{ alias: 'Umb.Condition.SectionAlias', value: 'Tollervey.LightningPayments.Section' }],
+    conditions: [{ alias: 'Umb.Condition.SectionAlias', match: 'Tollervey.LightningPayments.Section' }], // Updated: Use 'match' instead of 'value'
     meta: {
       entityType: 'lightning',
       views: [
@@ -45,7 +45,7 @@ const dashboardManifests = [
     name: 'Lightning UI',
     elementName: 'lightning-payments-dashboard',
     js: () => import('./dashboards/dashboard.element'), // Adjust path if needed; assumes dashboard.element.ts is moved to src/dashboards/
-    conditions: [{ alias: 'Umb.Condition.WorkspaceAlias', value: 'Tollervey.LightningPayments.Workspace' }]
+    conditions: [{ alias: 'Umb.Condition.WorkspaceAlias', match: 'Tollervey.LightningPayments.Workspace' }] // Updated: Use 'match' instead of 'value'
   },
   {
     // keep the dashboard so the built-in Dashboard view can also show it
@@ -60,7 +60,7 @@ const dashboardManifests = [
       pathname: 'lightning-payments',
       icon: 'icon-thunder'
     },
-    conditions: [{ alias: 'Umb.Condition.WorkspaceAlias', value: 'Tollervey.LightningPayments.Workspace' }]
+    conditions: [{ alias: 'Umb.Condition.WorkspaceAlias', match: 'Tollervey.LightningPayments.Workspace' }] // Updated: Use 'match' instead of 'value'
   }
 ];
 
@@ -119,7 +119,7 @@ const propertyEditorManifests = [
       valueType: 'JSON',
       settings: {
         properties: [],
-        defaultData: { enabled: false, defaultAmounts: [500,1000,2500], label: 'Send a tip' }
+        defaultData: { enabled: !1, defaultAmounts: [500,1000,2500], label: 'Send a tip' }
       }
     }
   }
