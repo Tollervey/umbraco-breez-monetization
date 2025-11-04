@@ -4,10 +4,15 @@ export const manifests = [
     alias: 'Tollervey.LightningPayments.Section',
     name: 'Lightning Payments',
     weight: 10,
-    meta: { label: 'Lightning Payments', pathname: 'lightning-payments', icon: 'icon-thunder' }
+    meta: {
+      label: 'Lightning Payments',
+      pathname: 'lightning-payments',
+      icon: 'icon-thunder',
+      // ensure a workspace is selected when opening the section
+      defaultWorkspace: 'Tollervey.LightningPayments.Workspace'
+    }
   },
   {
-    // Custom workspace for the section
     type: 'workspace',
     alias: 'Tollervey.LightningPayments.Workspace',
     name: 'Lightning Payments Workspace',
@@ -15,15 +20,13 @@ export const manifests = [
     meta: {
       entityType: 'lightning',
       views: [
-        // Built-in Dashboard host (discovers dashboards by WorkspaceAlias)
         { alias: 'Umb.WorkspaceView.Dashboard', name: 'Dashboard', weight: 0 },
-        // Our own view that mounts the element directly (fallback/diagnostics)
         { alias: 'Tollervey.LightningPayments.WorkspaceView.Main', name: 'Lightning UI', weight: 1 }
       ]
     }
   },
   {
-    // Register the custom workspace view that mounts our element
+    // register our direct view that mounts the web component
     type: 'workspaceView',
     alias: 'Tollervey.LightningPayments.WorkspaceView.Main',
     name: 'Lightning UI',
@@ -32,7 +35,7 @@ export const manifests = [
     conditions: [{ alias: 'Umb.Condition.WorkspaceAlias', value: 'Tollervey.LightningPayments.Workspace' }]
   },
   {
-    // Keep the dashboard for the built-in Dashboard view
+    // keep the dashboard so the built-in Dashboard view can also show it
     type: 'dashboard',
     alias: 'Tollervey.LightningPayments.Dashboard',
     name: 'Lightning Payments Dashboard',
