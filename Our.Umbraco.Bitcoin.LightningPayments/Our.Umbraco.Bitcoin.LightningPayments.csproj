@@ -10,7 +10,7 @@
   <PropertyGroup>
 	  <PackageId>Our.Umbraco.Bitcoin.LightningPayments</PackageId>
 	  <Title>Bitcoin Lightning Payments for Umbraco</Title>
-	  <Version>0.0.2</Version>
+	  <Version>0.0.3</Version>
 	  <Authors>Andrew Tollervey</Authors>
 	  <Description>A package to extend Umbraco 16 to allow nodeless Lightning Network payments with the BreezSdk.</Description>
 	  <PackageTags>umbraco;umbraco-cms;umbraco-package;v16;lightning;bitcoin;payments</PackageTags>
