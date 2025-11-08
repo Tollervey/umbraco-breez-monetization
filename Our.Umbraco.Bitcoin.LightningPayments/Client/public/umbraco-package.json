@@ -1,0 +1,35 @@
+{
+  "id": "Our.Umbraco.Bitcoin.LightningPayments",
+  "name": "Our.Umbraco.Bitcoin.LightningPayments",
+  "version": "0.0.1",
+  "allowTelemetry": true,
+  "extensions": [
+    {
+      "type": "section",
+      "alias": "lightningPayments",
+      "name": "Lightning Payments",
+      "meta": {
+        "label": "Lightning Payments",
+        "pathname": "lightning-payments",
+        "icon": "icon-wallet"
+      }
+    },
+    {
+      "type": "sectionView",
+      "alias": "lightningPaymentsView",
+      "name": "Lightning Payments View",
+      "element": "/App_Plugins/OurUmbracoBitcoinLightningPayments/dashboard.element.js",
+      "meta": {
+        "label": "Dashboard",
+        "icon": "icon-wallet",
+        "pathname": "dashboard"
+      },
+      "conditions": [
+        {
+          "alias": "Umb.Condition.SectionAlias",
+          "match": "lightningPayments"
+        }
+      ]
+    }
+  ]
+}

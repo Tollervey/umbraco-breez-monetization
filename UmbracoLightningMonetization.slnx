@@ -1,3 +1,6 @@
 <Solution>
+  <Project Path="../Spikes/Umbraco.DummyExtensions/Umbraco.DummyExtensions.csproj" />
+  <Project Path="../Spikes/UmbracoProject1/UmbracoProject1/UmbracoProject1.csproj" />
+  <Project Path="Our.Umbraco.Bitcoin.LightningPayments/Our.Umbraco.Bitcoin.LightningPayments.csproj" Id="e98f398e-78d9-459f-9045-c6c8957a0e85" />
   <Project Path="Tollervey.Umbraco.LightningPayments/Tollervey.Umbraco.LightningPayments.UI.csproj" />
 </Solution>
