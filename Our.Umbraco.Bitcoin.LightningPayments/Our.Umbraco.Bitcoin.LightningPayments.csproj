@@ -9,12 +9,27 @@
 
   <PropertyGroup>
 	  <PackageId>Our.Umbraco.Bitcoin.LightningPayments</PackageId>
+	  <Product>Our.Umbraco.Bitcoin.LightningPayments</Product>
 	  <Title>Bitcoin Lightning Payments for Umbraco</Title>
-	  <Version>0.0.4</Version>
 	  <Authors>Andrew Tollervey</Authors>
 	  <Description>A package to extend Umbraco 16 to allow nodeless Lightning Network payments with the BreezSdk.</Description>
 	  <PackageTags>umbraco;umbraco-cms;umbraco-package;v16;lightning;bitcoin;payments</PackageTags>
+	  <PackageProjectUrl>https://github.com/Tollervey/umbraco-breez-monetization</PackageProjectUrl>
+	  <RepositoryUrl>https://github.com/Tollervey/umbraco-breez-monetization</RepositoryUrl>
+	  <RepositoryType>git</RepositoryType>
+	  <PackageReadmeFile>README.md</PackageReadmeFile>
+	  <!-- SPDX license expression; also include LICENSE file in the package -->
 	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
+	  <!-- package icon (kept small) -->
+	  <PackageIcon>icon.png</PackageIcon>
+	  <!-- Symbols and deterministic builds -->
+	  <IncludeSymbols>true</IncludeSymbols>
+	  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	  <DebugType>portable</DebugType>
+	  <Deterministic>true</Deterministic>
+	  <PublishRepositoryUrl>true</PublishRepositoryUrl>
+	  <EmbedUntrackedSources>true</EmbedUntrackedSources>
+	  <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>
