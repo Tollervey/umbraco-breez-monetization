@@ -1,73 +1,478 @@
 import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
-import { html, css, customElement, state } from '@umbraco-cms/backoffice/external/lit';
-//import { tryExecute } from '@umbraco-cms/backoffice/resources';
-//import { umbHttpClient } from '@umbraco-cms/backoffice/http-client';
+import { html, css, state } from '@umbraco-cms/backoffice/external/lit';
+// @ts-ignore
+import * as QRCode from "qrcode";
 
-@customElement('lightning-payments-view')
-export class LightningPaymentsViewElement extends UmbLitElement {
-    static styles = css`
-        :host {
-            display: block;
-            padding: 20px;
-        }
-        uui-box {
-            margin-bottom: 1rem;
-        }
-        #status-label {
-            padding: 1rem;
-            background: #f8f8f8;
-            border-radius: var(--uui-border-radius);
-            font-family: monospace;
-        }
-    `;
+const dbg = (...args: any[]) => console.info('[LightningPayments][Dashboard]', ...args);
 
-    @state()
-    private _statusMessage = "Click the button to fetch payment status...";
+interface Payment {
+  paymentHash: string;
+  contentId: number;
+  userSessionId: string;
+  status: string;
+}
 
-    @state()
-    private _isLoading = false;
+// @ts-ignore
+// @customElement("lightning-payments-dashboard")
+export class OurLightningPaymentsDashboardElement extends UmbLitElement {
+  @state() private payments: Payment[] = [];
+  @state() private filteredPayments: Payment[] = [];
+  @state() private searchTerm: string = "";
 
-    render() {
-        return html`
-            <uui-box headline="Lightning Payments Dashboard">
-                <div id="status-label">
-                    <strong>${this._statusMessage}</strong>
+  // status/limits/fees
+  @state() private connected = false;
+  @state() private offlineMode = false;
+  @state() private minSat: number | null = null;
+  @state() private maxSat: number | null = null;
+  @state() private recommendedFees: any = null;
+  @state() private loadingStatus = true;
+  @state() private errorStatus = "";
+
+  // health check
+  @state() private health: { status: string; description?: string } | null = null;
+
+  // quote
+  @state() private quoteAmount =1000;
+  @state() private quoting = false;
+  @state() private quoteError = "";
+  @state() private quoteResult: { amountSat: number; feesSat: number; method: "string" } | null = null;
+
+  // test invoice
+  @state() private testAmount =1000;
+  @state() private testDescription = "Test invoice";
+  @state() private creatingInvoice = false;
+  @state() private createdInvoice: string | null = null;
+  @state() private createdPaymentHash: string | null = null;
+  @state() private invoiceQrDataUrl: string | null = null;
+  @state() private invoiceError = "";
+
+  // refresh tools
+  @state() private autoRefresh = false;
+  private refreshTimer: number | null = null;
+  private readonly refreshIntervalMs =10000;
+  @state() private refreshing = false;
+
+  // copy feedback
+  @state() private copyOk = false;
+
+  // row actions
+  @state() private rowActionBusy: Record<string, boolean> = {};
+  @state() private rowActionError: Record<string, string> = {};
+
+  // realtime event log
+  private _evtSrc?: EventSource;
+  @state() private eventLog: Array<{ time: string; type: string; details: string }> = [];
+  private _loggedFirstRender = false;
+
+  constructor() {
+    super();
+    dbg('constructed');
+    (window as any).__LP_DEBUG__ = this; // expose instance for quick DevTools checks
+    this.loadAll();
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    dbg('connectedCallback');
+    if (this.autoRefresh) this.startAutoRefresh();
+    this.connectRealtime();
+  }
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    dbg('disconnectedCallback');
+    this.stopAutoRefresh();
+    this._evtSrc?.close();
+    this._evtSrc = undefined;
+  }
+
+  private connectRealtime() {
+    try {
+      dbg('SSE connect', '/api/public/lightning/realtime/subscribe');
+      this._evtSrc?.close();
+      this._evtSrc = new EventSource('/api/public/lightning/realtime/subscribe');
+      this._evtSrc.addEventListener('open', () => dbg('SSE open'));
+      this._evtSrc.onerror = (e: any) => dbg('SSE error', e);
+      this._evtSrc.addEventListener('payment-succeeded', async () => { dbg('SSE payment-succeeded'); await this.loadPayments(); });
+      this._evtSrc.addEventListener('breez-event', (ev: MessageEvent) => {
+        try {
+          const data = JSON.parse(ev.data);
+          const entry = { time: new Date().toLocaleTimeString(), type: String(data?.type ?? 'Unknown'), details: String(data?.details ?? '') };
+          const max =50;
+          this.eventLog = [entry, ...this.eventLog].slice(0, max);
+        } catch (err) { dbg('SSE breez-event parse error', err); }
+      });
+    } catch (err) { dbg('connectRealtime failed', err); }
+  }
+
+  private async loadAll() {
+    dbg('loadAll:start');
+    try {
+      await Promise.all([
+        this.loadStatus(),
+        this.loadLimits(),
+        this.loadRecommendedFees(),
+        this.loadHealth(),
+        this.loadPayments(),
+      ]);
+      dbg('loadAll:done');
+    } catch (err) { dbg('loadAll:error', err); }
+  }
+
+  private async loadStatus() {
+    this.loadingStatus = true;
+    this.errorStatus = "";
+    try {
+      const url = "/umbraco/management/api/lightningpayments/GetStatus";
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      this.connected = !!data.connected;
+      this.offlineMode = !!data.offlineMode;
+    } catch (err: any) {
+      this.errorStatus = err?.message ?? "Failed to load status";
+      dbg('GET error /GetStatus', this.errorStatus);
+    } finally {
+      this.loadingStatus = false;
+    }
+  }
+
+  private async loadLimits() {
+    const url = "/umbraco/management/api/lightningpayments/GetLightningReceiveLimits";
+    try {
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
+      if (!res.ok) return;
+      const data = await res.json();
+      this.minSat = typeof data.minSat === "number" ? data.minSat : null;
+      this.maxSat = typeof data.maxSat === "number" ? data.maxSat : null;
+    } catch (err) { dbg('GET error /GetLightningReceiveLimits', err); }
+  }
+
+  private async loadRecommendedFees() {
+    const url = "/umbraco/management/api/lightningpayments/GetRecommendedFees";
+    try {
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
+      if (!res.ok) return;
+      this.recommendedFees = await res.json();
+    } catch (err) { dbg('GET error /GetRecommendedFees', err); }
+  }
+
+  private async loadHealth() {
+    const url = "/health/ready";
+    try {
+      dbg('GET', url);
+      const res = await fetch(url);
+      dbg('GET result', url, res.status);
+      if (!res.ok) { this.health = { status: `HTTP ${res.status}` }; return; }
+      const txt = await res.text();
+      this.health = { status: "Healthy", description: txt?.substring(0,120) };
+    } catch (e: any) {
+      this.health = { status: "Unknown", description: e?.message };
+      dbg('GET error /health/ready', e);
+    }
+  }
+
+  async loadPayments() {
+    const url = "/umbraco/management/api/lightningpayments/GetAllPayments";
+    try {
+      dbg('GET', url);
+      const response = await fetch(url);
+      dbg('GET result', url, response.status);
+      if (response.ok) {
+        this.payments = await response.json();
+        this.filteredPayments = this.payments;
+        dbg('payments loaded', this.payments.length);
+      }
+    } catch (error) {
+      dbg('GET error /GetAllPayments', error);
+    }
+  }
+
+  private handleSearch(e: Event) {
+    const target = e.target as HTMLInputElement;
+    this.searchTerm = target.value.toLowerCase();
+    this.filteredPayments = this.payments.filter(
+      (p) => p.paymentHash.toLowerCase().includes(this.searchTerm) || p.contentId.toString().includes(this.searchTerm) || p.status.toLowerCase().includes(this.searchTerm)
+    );
+  }
+
+  private async createTestInvoice() {
+    this.creatingInvoice = true;
+    this.invoiceError = "";
+    this.createdInvoice = null;
+    this.createdPaymentHash = null;
+    this.invoiceQrDataUrl = null;
+    const url = "/umbraco/management/api/lightningpayments/CreateTestInvoice";
+    try {
+      dbg('POST', url, { amountSat: this.testAmount, description: this.testDescription });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amountSat: this.testAmount, description: this.testDescription }) });
+      dbg('POST result', url, res.status);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      this.createdInvoice = data.invoice;
+      this.createdPaymentHash = data.paymentHash;
+      if (this.createdInvoice) {
+        try { this.invoiceQrDataUrl = await QRCode.toDataURL(this.createdInvoice, { width:240, margin:1 }); } catch (qrErr) { dbg('QR generation failed', qrErr); }
+      }
+    } catch (err: any) {
+      this.invoiceError = err?.message ?? "Failed to create invoice";
+      dbg('POST error /CreateTestInvoice', this.invoiceError);
+    } finally {
+      this.creatingInvoice = false;
+    }
+  }
+
+  private async getQuote() {
+    this.quoting = true;
+    this.quoteError = "";
+    this.quoteResult = null;
+    try {
+      const url = new URL("/umbraco/management/api/lightningpayments/GetPaywallReceiveFeeQuote", location.origin);
+      url.searchParams.set("contentId", String(0));
+      dbg('GET', url.toString());
+      const res = await fetch(url.toString());
+      dbg('GET result', '/umbraco/management/api/lightningpayments/GetPaywallReceiveFeeQuote', res.status);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      this.quoteResult = await res.json();
+    } catch (err: any) {
+      this.quoteError = err?.message ?? "Failed to get quote";
+      dbg('GET error /GetPaywallReceiveFeeQuote', this.quoteError);
+    } finally {
+      this.quoting = false;
+    }
+  }
+
+  private onRefreshClick = async () => { this.refreshing = true; try { await this.loadAll(); } finally { this.refreshing = false; } };
+  private toggleAutoRefresh = (e: Event) => { const checked = (e.target as HTMLInputElement).checked; this.autoRefresh = checked; if (checked) this.startAutoRefresh(); else this.stopAutoRefresh(); };
+  private startAutoRefresh() { this.stopAutoRefresh(); dbg('autoRefresh:start'); this.refreshTimer = window.setInterval(() => this.loadAll(), this.refreshIntervalMs); }
+  private stopAutoRefresh() { if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null; dbg('autoRefresh:stop'); } }
+  private async copyInvoice() { if (!this.createdInvoice) return; try { await navigator.clipboard.writeText(this.createdInvoice); this.copyOk = true; setTimeout(() => (this.copyOk = false),1500); } catch (err) { dbg('copy failed', err); } }
+  private async sendRowAction(endpoint: string, paymentHash: string) {
+    this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: true };
+    this.rowActionError = { ...this.rowActionError, [paymentHash]: "" };
+    try {
+      const url = `/umbraco/management/api/lightningpayments/${endpoint}`;
+      dbg('POST', url, { paymentHash });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paymentHash }) });
+      dbg('POST result', url, res.status);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await this.loadPayments();
+    } catch (err: any) {
+      this.rowActionError = { ...this.rowActionError, [paymentHash]: err?.message ?? "Action failed" };
+      dbg('POST error', endpoint, err);
+    } finally {
+      this.rowActionBusy = { ...this.rowActionBusy, [paymentHash]: false };
+    }
+  }
+
+  render() {
+    if (!this._loggedFirstRender) { this._loggedFirstRender = true; dbg('render:first'); }
+    return html`
+      <umb-body-layout header-transparent>
+        <div slot="header"><h2>Lightning Payments</h2></div>
+        <div slot="main">
+          ${this.renderStatus()}
+          ${this.renderQuote()}
+          ${this.renderTestTools()}
+          ${this.renderPaymentsTable()}
+          ${this.renderEventLog()}
+        </div>
+      </umb-body-layout>`;
+  }
+
+  private renderStatus() {
+    return html`
+      <uui-box headline="Status" style="margin-bottom: var(--uui-size-layout-1)">
+        <div class="toolbar">
+          <uui-button look="secondary" @click=${this.onRefreshClick} ?disabled=${this.refreshing}>${this.refreshing ? "Refreshing…" : "Refresh"}</uui-button>
+          <label class="auto"><input type="checkbox" .checked=${this.autoRefresh} @change=${this.toggleAutoRefresh} /><span>Auto-refresh</span></label>
+        </div>
+        ${this.loadingStatus ? html`<div>Loading status…</div>` : this.errorStatus ? html`<uui-alert color="danger">${this.errorStatus}</uui-alert>` : html`
+          <div class="status-grid">
+            <div><strong>SDK Connected:</strong> ${this.connected ? "Yes" : "No"}</div>
+            <div><strong>Offline Mode:</strong> ${this.offlineMode ? "Yes" : "No"}</div>
+            <div><strong>Lightning Limits:</strong> ${this.minSat != null && this.maxSat != null ? `${this.minSat} – ${this.maxSat} sats` : "Unknown"}</div>
+            <div><strong>Health:</strong> ${this.health?.status ?? "Unknown"}</div>
+          </div>
+          ${this.recommendedFees ? html`<details class="fees-details"><summary>Recommended on-chain fees</summary><pre>${JSON.stringify(this.recommendedFees, null,2)}</pre></details>` : ""}
+        `}
+      </uui-box>`;
+  }
+
+  private renderQuote() {
+    return html`
+      <uui-box headline="Receive fee quote" style="margin-bottom: var(--uui-size-layout-1)">
+        <div class="quote-row">
+          <uui-label for="q-amount">Amount (sats)</uui-label>
+          <uui-input id="q-amount" type="number" min="1" step="1" .value=${String(this.quoteAmount)} @input=${(e: any) => this.quoteAmount = Math.max(1, parseInt(e.target.value ||1,10))}></uui-input>
+          <uui-button look="primary" @click=${this.getQuote} ?disabled=${this.quoting}>${this.quoting ? "Quoting…" : "Get quote"}</uui-button>
+        </div>
+        ${this.quoteError ? html`<uui-alert color="danger">${this.quoteError}</uui-alert>` : ""}
+        ${this.quoteResult ? html`<div class="quote-out">Estimated fees: <strong>${this.quoteResult.feesSat}</strong> sats (${this.quoteResult.method})</div>` : ""}
+      </uui-box>`;
+  }
+
+  private renderTestTools() {
+    const lightningUri = this.createdInvoice ? `lightning:${this.createdInvoice}` : null;
+    return html`
+      <uui-box headline="Test invoice" style="margin-bottom: var(--uui-size-layout-1)">
+        <div class="test-grid">
+          <div>
+            <uui-label for="ti-amount">Amount (sats)</uui-label>
+            <uui-input
+              id="ti-amount"
+              type="number"
+              min="1"
+              step="1"
+              .value=${String(this.testAmount)}
+              @input=${(e: any) =>
+                (this.testAmount = Math.max(1, parseInt(e.target.value || 1, 10)))}}
+            ></uui-input>
+          </div>
+          <div>
+            <uui-label for="ti-desc">Description</uui-label>
+            <uui-input
+              id="ti-desc"
+              type="text"
+              .value=${this.testDescription}
+              @input=${(e: any) => (this.testDescription = e.target.value)}
+            ></uui-input>
+          </div>
+        </div>
+        ${this.invoiceError
+          ? html`<uui-alert color="danger">${this.invoiceError}</uui-alert>`
+          : ""}
+        <div class="test-actions">
+          <uui-button
+            look="primary"
+            @click=${this.createTestInvoice}
+            ?disabled=${this.creatingInvoice}
+          >${this.creatingInvoice ? "Creating…" : "Create invoice"}</uui-button>
+        </div>
+        ${this.createdInvoice
+          ? html`
+              <div class="invoice-out">
+                ${this.invoiceQrDataUrl
+                  ? html`<img class="qr" src="${this.invoiceQrDataUrl}" alt="Invoice QR" />`
+                  : ""}
+                <div class="invoice-text">
+                  <uui-label>Invoice</uui-label>
+                  <uui-textarea
+                    readonly
+                    .value=${this.createdInvoice}
+                  ></uui-textarea>
+                  <div class="actions">
+                    <uui-button look="secondary" @click=${this.copyInvoice}>${this.copyOk ? "Copied" : "Copy"}</uui-button>
+                    ${lightningUri
+                      ? html`<a class="open-wallet" href="${lightningUri}">Open in wallet</a>`
+                      : ""}
+                  </div>
+                  <div class="hash">Payment hash: ${this.createdPaymentHash?.slice(0, 12)}…</div>
                 </div>
-            </uui-box>
-            <uui-button
-                look="primary"
-                label="Fetch Status"
-                @click=${this._handleFetchStatusClick}
-                ?disabled=${this._isLoading}
-                state=${this._isLoading ? 'waiting' : 'default'}>
-            </uui-button>
-        `;
-    }
+              </div>
+            `
+          : ""}
+      </uui-box>
+    `;
+  }
 
-    private async _handleFetchStatusClick() {
-        this._isLoading = true;
+  private renderPaymentsTable() {
+    return html`
+      <uui-box headline="Payments">
+        <div slot="header">
+          <input
+            type="text"
+            placeholder="Search payments..."
+            @input=${this.handleSearch}
+            style="width:100%; padding:8px; margin-bottom:16px;"
+          />
+        </div>
+        <uui-table>
+          <uui-table-head>
+            <uui-table-head-cell>Payment Hash</uui-table-head-cell>
+            <uui-table-head-cell>Content ID</uui-table-head-cell>
+            <uui-table-head-cell>Session ID</uui-table-head-cell>
+            <uui-table-head-cell>Status</uui-table-head-cell>
+            <uui-table-head-cell style="width:260px">Actions</uui-table-head-cell>
+          </uui-table-head>
+          <uui-table-body>
+            ${this.filteredPayments.map((payment) => {
+              const busy = !!this.rowActionBusy[payment.paymentHash];
+              const error = this.rowActionError[payment.paymentHash];
+              return html`
+                <uui-table-row>
+                  <uui-table-cell>${payment.paymentHash}</uui-table-cell>
+                  <uui-table-cell>${payment.contentId}</uui-table-cell>
+                  <uui-table-cell>${payment.userSessionId}</uui-table-cell>
+                  <uui-table-cell>${payment.status}</uui-table-cell>
+                  <uui-table-cell>
+                    <div class="row-actions">
+                      <uui-button look="secondary" compact @click=${() => this.sendRowAction("ConfirmPayment", payment.paymentHash)} ?disabled=${busy}>Confirm</uui-button>
+                      <uui-button look="warning" compact @click=${() => this.sendRowAction("MarkAsFailed", payment.paymentHash)} ?disabled=${busy}>Fail</uui-button>
+                      <uui-button look="danger" compact @click=${() => this.sendRowAction("MarkAsExpired", payment.paymentHash)} ?disabled=${busy}>Expire</uui-button>
+                      <uui-button look="secondary" compact @click=${() => this.sendRowAction("MarkAsRefundPending", payment.paymentHash)} ?disabled=${busy}>Refund pending</uui-button>
+                      <uui-button look="positive" compact @click=${() => this.sendRowAction("MarkAsRefunded", payment.paymentHash)} ?disabled=${busy}>Refunded</uui-button>
+                    </div>
+                    ${error ? html`<div class="row-error">${error}</div>` : ""}
+                  </uui-table-cell>
+                </uui-table-row>`;
+            })}
+          </uui-table-body>
+        </uui-table>
+      </uui-box>
+    `;
+  }
 
-        /*const request = umbHttpClient.get({
-            url: '/umbraco/management/api/v1/lightning-payments/status'
-        });*/
+  private renderEventLog() {
+    return html`
+      <uui-box headline="Live events">
+        <ul class="event-log">
+          ${this.eventLog.map(e => html`<li><span class="t">${e.time}</span> <strong>${e.type}</strong> <span class="d">${e.details}</span></li>`)}
+        </ul>
+      </uui-box>
+    `;
+  }
 
-        /*const { data, error } = await tryExecute(this, request);
-
-        if (error) {
-            console.error('Error fetching status:', error);
-            this._statusMessage = "Error fetching status. See console for details.";
-        } else {
-            this._statusMessage = "Hello";
-        }*/
-        this._statusMessage = "Hello";
-        this._isLoading = false;
-    }
+  static styles = [
+    css`
+      :host { display:block; padding: var(--uui-size-layout-1); }
+      uui-box { margin-bottom: var(--uui-size-layout-1); }
+      h2 { margin-top:0; }
+      .toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; }
+      .auto { display:flex; gap:0.35rem; align-items:center; color: var(--uui-color-text); }
+      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem1rem; }
+      .fees-details { margin-top:0.5rem; }
+      .quote-row { display:grid; grid-template-columns:1fr1fr auto; gap:0.5rem; align-items:end; }
+      .quote-out { margin-top:0.5rem; }
+      .test-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap:1rem;
+        align-items: end;
+      }
+      .test-actions { margin-top:0.5rem; }
+      .invoice-out { margin-top:1rem; display: grid; grid-template-columns:240px1fr; gap:1rem; }
+      .qr { width:240px; height:240px; background: white; border:1px solid var(--uui-color-border); border-radius:4px; padding:4px; }
+      .invoice-text uui-textarea { width:100%; height:120px; }
+      .actions { display: flex; gap:0.5rem; align-items: center; margin-top:0.5rem; }
+      .open-wallet { text-decoration: none; background: var(--uui-color-highlight); color: var(--uui-color-surface); padding:0.4rem0.6rem; border-radius:4px; }
+      .hash { margin-top:0.5rem; color: var(--uui-color-text-alt); font-family: monospace; }
+      .row-actions { display: flex; flex-wrap: wrap; gap:0.25rem; }
+      .row-error { margin-top:0.25rem; color: var(--uui-color-danger); font-size:0.85rem; }
+      .event-log { list-style: none; padding:0; margin:0; display:flex; flex-direction: column; gap:0.25rem; }
+      .event-log .t { color: var(--uui-color-text-alt); margin-right:0.5rem; }
+      .event-log .d { color: var(--uui-color-text-alt); }
+    `,
+  ];
 }
 
-export default LightningPaymentsViewElement;
+export default OurLightningPaymentsDashboardElement;
 
-declare global {
-    interface HTMLElementTagNameMap {
-        'lightning-payments-view': LightningPaymentsViewElement;
-    }
-}
+customElements.define("lightning-payments-dashboard", OurLightningPaymentsDashboardElement);
+
+declare global { interface HTMLElementTagNameMap { "lightning-payments-dashboard": OurLightningPaymentsDashboardElement; } }

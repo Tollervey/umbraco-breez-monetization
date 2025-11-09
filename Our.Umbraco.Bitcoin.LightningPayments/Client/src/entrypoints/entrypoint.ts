@@ -10,7 +10,7 @@ export const onInit: UmbEntryPointOnInit = (_host, _extensionRegistry) => {
   console.log("Hello from my extension 🎉");
   // Will use only to add in Open API config with generated TS OpenAPI HTTPS Client
   // Do the OAuth token handshake stuff
-  _host.consumeContext(UMB_AUTH_CONTEXT, async (authContext) => {
+  _host.consumeContext(UMB_AUTH_CONTEXT as any, async (authContext: any) => {
     // Get the token info from Umbraco
     const config = authContext?.getOpenApiConfiguration();
 
