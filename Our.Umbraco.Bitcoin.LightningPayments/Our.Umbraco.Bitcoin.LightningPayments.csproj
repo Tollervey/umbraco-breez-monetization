@@ -10,7 +10,7 @@
   <PropertyGroup>
 	  <PackageId>Our.Umbraco.Bitcoin.LightningPayments</PackageId>
 	  <Title>Bitcoin Lightning Payments for Umbraco</Title>
-	  <Version>0.0.3</Version>
+	  <Version>0.0.4</Version>
 	  <Authors>Andrew Tollervey</Authors>
 	  <Description>A package to extend Umbraco 16 to allow nodeless Lightning Network payments with the BreezSdk.</Description>
 	  <PackageTags>umbraco;umbraco-cms;umbraco-package;v16;lightning;bitcoin;payments</PackageTags>
@@ -22,6 +22,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Breez.Sdk.Liquid" Version="0.11.9" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="16.*" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="16.*" />
     <PackageReference Include="Umbraco.Cms.Api.Common" Version="16.*" />

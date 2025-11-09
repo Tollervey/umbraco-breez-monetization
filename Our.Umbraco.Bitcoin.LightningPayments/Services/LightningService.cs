@@ -1,4 +1,4 @@
-﻿namespace Our.Umbraco.Bitcoin.LightningPayments.Services
+namespace Our.Umbraco.Bitcoin.LightningPayments.Services
 {
     public class LightningService : ILightningService
     {
@@ -11,3 +11,4 @@
         }
     }
 }
+

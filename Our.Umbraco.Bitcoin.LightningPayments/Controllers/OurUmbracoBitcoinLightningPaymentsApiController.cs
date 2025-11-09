@@ -41,3 +41,5 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Controllers
         public IUser? WhoAmI() => _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser;
     }
 }
+
+

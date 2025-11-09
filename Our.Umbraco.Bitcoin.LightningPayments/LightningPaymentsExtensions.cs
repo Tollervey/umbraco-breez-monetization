@@ -1,0 +1,165 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Our.Umbraco.Bitcoin.LightningPayments.Configuration;
+using Our.Umbraco.Bitcoin.LightningPayments.Middleware;
+using Our.Umbraco.Bitcoin.LightningPayments.Services;
+using Umbraco.Cms.Core.DependencyInjection;
+using Umbraco.Cms.Web.Common.ApplicationBuilder;
+using Our.Umbraco.Bitcoin.LightningPayments.Services.Realtime;
+using Our.Umbraco.Bitcoin.LightningPayments.Services.RateLimiting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using System;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Our.Umbraco.Bitcoin.LightningPayments.Infrastructure;
+
+namespace Microsoft.Extensions.DependencyInjection
+{
+    /// <summary>
+    /// Extension methods to register Lightning Payments services and related features with Umbraco.
+    /// </summary>
+    public static class LightningPaymentsExtensions
+    {
+        public static IUmbracoBuilder AddLightningPayments(this IUmbracoBuilder builder)
+        {
+            // STEP 1: This is the first log. If you don't see this, the consuming app is not calling this method.
+            var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments.Startup");
+            logger.LogInformation("--- Step 1: AddLightningPayments() called. Assembly is now loaded. ---");
+
+            // Bind the "LightningPayments" section of appsettings to the settings model
+            builder.Services.AddOptions<LightningPaymentsSettings>()
+                .Bind(builder.Config.GetSection(LightningPaymentsSettings.SectionName))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+
+            builder.Services.AddSingleton<IValidateOptions<LightningPaymentsSettings>, LightningPaymentsSettingsValidator>();
+
+            // Bind rate limiting options (optional)
+            var rlSection = builder.Config.GetSection($"{LightningPaymentsSettings.SectionName}:RateLimiting");
+            var rlOptions = rlSection.Get<RateLimitingOptions>() ?? new RateLimitingOptions();
+            builder.Services.Configure<RateLimitingOptions>(rlSection);
+
+            // If consumer wants to use ASP.NET Core RateLimiting middleware, register it according to options
+            if (rlOptions.Enabled && rlOptions.UseAspNetRateLimiter)
+            {
+                builder.Services.AddRateLimiter(options =>
+                {
+                    options.RejectionStatusCode = rlOptions.RejectionStatusCode;
+
+                    options.AddPolicy("InvoiceGeneration", context =>
+                    {
+                        string partitionKey = rlOptions.PartitionByIp
+                            ? (context.Connection.RemoteIpAddress?.ToString() ?? "unknown")
+                            : "default";
+
+                        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = rlOptions.PermitLimit,
+                            Window = TimeSpan.FromSeconds(Math.Max(1, rlOptions.WindowSeconds)),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = rlOptions.QueueLimit
+                        });
+                    });
+                });
+            }
+
+            // Default runtime mode marker (online by default)
+            builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: false));
+
+            // NOTE: Application Insights is intentionally NOT registered here automatically. Consumers should opt-in by calling
+            // AddLightningPaymentsApplicationInsights on the IUmbracoBuilder if they want AI wired up for this library.
+
+            // Register services
+            builder.Services.AddDbContext<PaymentDbContext>((sp, options) =>
+            {
+                var settings = sp.GetRequiredService<IOptions<LightningPaymentsSettings>>().Value;
+                var env = sp.GetRequiredService<IHostEnvironment>();
+                var dbLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("LightningPayments");
+
+                // Respect offline/in-memory mode at resolution time
+                var runtimeMode = sp.GetRequiredService<ILightningPaymentsRuntimeMode>();
+                var offlineOpts = sp.GetService<IOptions<OfflineLightningPaymentsOptions>>()?.Value;
+
+                if (runtimeMode.IsOffline && offlineOpts?.UseInMemoryStateService == true)
+                {
+                    options.UseInMemoryDatabase("LightningPayments_InMemory");
+                    dbLogger.LogInformation("LightningPayments running in OFFLINE mode (in-memory). Skipping SQLite registration.");
+                    return;
+                }
+
+                // Normalize SQLite connection string
+                var resolved = ConnectionStringResolver.Resolve(settings.ConnectionString, env, dbLogger);
+                options.UseSqlite(resolved);
+            });
+
+            builder.Services.AddScoped<IPaymentStateService, PersistentPaymentStateService>();
+            // Email removed by default to simplify setup: no IEmailService registration.
+
+            builder.Services.AddSingleton<IBreezSdkWrapper, BreezSdkWrapper>();
+            builder.Services.AddSingleton<IBreezSdkService, BreezSdkService>();
+            builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
+            builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
+            builder.Services.AddSingleton<BreezEventProcessor>();
+            builder.Services.AddSingleton<IBreezEventProcessor>(sp => sp.GetRequiredService<BreezEventProcessor>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<BreezEventProcessor>());
+
+            // Keep initializer registration, but it will self-skip when running offline with in-memory state.
+            builder.Services.AddHostedService<PaymentDbInitializer>();
+
+            builder.Services.AddMemoryCache();
+            builder.Services.AddScoped<IRuntimeSettingsService, RuntimeSettingsService>();
+
+            builder.Services.AddSingleton<SseHub>();
+            builder.Services.AddSingleton<IRateLimiter, MemoryRateLimiter>();
+            builder.Services.AddScoped<IInvoiceHelper, InvoiceHelper>();
+
+            builder.Services.AddHealthChecks().AddCheck<BreezSdkHealthCheck>("breez");
+
+            logger.LogInformation("--- Step 2: AddLightningPayments() completed service registration. ---");
+
+            return builder;
+        }
+
+        public static IUmbracoBuilder AddLightningPaymentsApplicationInsights(this IUmbracoBuilder builder, string connectionString)
+        {
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                builder.Services.AddApplicationInsightsTelemetry(o => o.ConnectionString = connectionString);
+            }
+            return builder;
+        }
+
+        public static IUmbracoBuilder AddLightningPaymentsApplicationInsightsFromConfig(this IUmbracoBuilder builder)
+        {
+            var aiConnectionString = builder.Config.GetSection(LightningPaymentsSettings.SectionName)["ApplicationInsightsConnectionString"];
+            return builder.AddLightningPaymentsApplicationInsights(aiConnectionString ?? string.Empty);
+        }
+
+        // Publicly exposed: enable offline mode for development/testing.
+        public static IUmbracoBuilder UseLightningPaymentsOffline(this IUmbracoBuilder builder, Action<OfflineLightningPaymentsOptions>? configure = null)
+        {
+            var options = new OfflineLightningPaymentsOptions();
+            configure?.Invoke(options);
+
+            builder.Services.AddSingleton<ILightningPaymentsRuntimeMode>(_ => new LightningPaymentsRuntimeMode(isOffline: true));
+            builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptions<OfflineLightningPaymentsOptions>>(
+                _ => Microsoft.Extensions.Options.Options.Create(options)
+            );
+
+            builder.Services.AddSingleton<IBreezSdkService, OfflineBreezSdkService>();
+            builder.Services.AddSingleton<IBreezSdkHandleProvider>(sp => (IBreezSdkHandleProvider)sp.GetRequiredService<IBreezSdkService>());
+            builder.Services.AddScoped<IBreezPaymentsFacade, BreezPaymentsFacade>();
+
+            if (options.UseInMemoryStateService)
+            {
+                builder.Services.AddScoped<IPaymentStateService, InMemoryPaymentStateService>();
+            }
+
+            return builder;
+        }
+    }
+}
+
