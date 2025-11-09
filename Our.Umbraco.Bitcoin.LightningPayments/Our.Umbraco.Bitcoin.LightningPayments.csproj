@@ -77,6 +77,8 @@
 
     <!-- However make the Umbraco-package.json included for dotnet pack or nuget package and visible to the solution -->
     <None Include="Client\public\umbraco-package.json" Pack="false" />
+    <Content Include="Client\src\tsconfig.node.json" />
+    <Content Include="Client\tsconfig.json" />
   </ItemGroup>
 
   <ItemGroup>
