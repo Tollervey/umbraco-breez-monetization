@@ -55,6 +55,8 @@
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="16.*" />
     <PackageReference Include="Umbraco.Cms.Api.Common" Version="16.*" />
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="16.*" />
+    <!-- Nerdbank.GitVersioning to support Git-based versioning (private asset) -->
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
