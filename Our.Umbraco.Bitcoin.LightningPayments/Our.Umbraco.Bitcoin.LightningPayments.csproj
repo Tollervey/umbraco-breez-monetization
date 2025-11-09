@@ -134,7 +134,7 @@
   </Target>
 
   <!-- Copy the manifest from Client/public into wwwroot for BOTH Build and Pack -->
-  <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Build;Pack" DependsOnTargets="BuildClient_OnBuild;BuildClient">
+  <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Build;Pack" DependsOnTargets="BuildClient_OnBuild;BuildClient;UpdateUmbracoPackageVersion">
     <Message Importance="high" Text="Copying umbraco-package.json into wwwroot/App_Plugins..." />
     <Copy
       SourceFiles="Client\public\umbraco-package.json"
@@ -147,4 +147,9 @@
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$m=Get-Content -Raw 'wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json' | ConvertFrom-Json; if($null -eq $m.extensions -or $m.allowTelemetry -ne $true){ Write-Error 'umbraco-package.json must contain an extensions array and allowTelemetry:true'; exit 1 }&quot;" />
   </Target>
 
+  <!-- Update the version in umbraco-package.json to match the Nerdbank.GitVersioning version -->
+  <Target Name="UpdateUmbracoPackageVersion" BeforeTargets="CopyUmbracoPackageManifest">
+    <Message Importance="high" Text="Updating version in Client\public\umbraco-package.json to $(Version)..." />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$json = Get-Content -Raw 'Client\public\umbraco-package.json' | ConvertFrom-Json; $json.version = '$(Version)'; $json | ConvertTo-Json -Depth 10 | Set-Content 'Client\public\umbraco-package.json'&quot;" />
+   </Target>
 </Project>
