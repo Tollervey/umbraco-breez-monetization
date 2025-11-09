@@ -10,6 +10,7 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
     <!-- Build client + copy manifest during regular Build for local F5 runs -->
     <BuildClientOnBuild>true</BuildClientOnBuild>
+    <BuildClientOnPack>true</BuildClientOnPack>
     <!-- Enable .NET analyzers and use the latest analysis level. Do not treat warnings as errors here to avoid breaking consumers; CI can enable that. -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
