@@ -41,6 +41,7 @@
 	  <EmbedUntrackedSources>true</EmbedUntrackedSources>
 	  <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <PackageOutputPath>C:\LocalNuget</PackageOutputPath>
+    <Version>1.0.69</Version>
   </PropertyGroup>
 
   <ItemGroup>
