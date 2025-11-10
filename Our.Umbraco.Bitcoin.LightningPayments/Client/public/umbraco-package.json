@@ -1,14 +1,14 @@
 {
     "id":  "Our.Umbraco.Bitcoin.LightningPayments",
     "name":  "Our.Umbraco.Bitcoin.LightningPayments",
-    "version":  "1.0.74-preview-g9de037eca0",
+    "version":  "1.0.75-preview-g39d88f54b8",
     "allowTelemetry":  true,
     "extensions":  [
                        {
                            "type":  "section",
                            "alias":  "lightningPayments",
                            "name":  "Lightning Payments",
-                           "element": "/App_Plugins/OurUmbracoBitcoinLightningPayments/dashboard.element.js",
+                           "element": "lightning-payments-dashboard",
                            "meta":  {
                                         "label":  "Lightning Payments",
                                         "pathname":  "lightning-payments",

@@ -3,6 +3,8 @@ import { html, css, state } from '@umbraco-cms/backoffice/external/lit';
 // @ts-ignore
 import * as QRCode from "qrcode";
 
+console.log("Lightning Payments Dashboard JS loaded");
+
 const dbg = (...args: any[]) => console.info('[LightningPayments][Dashboard]', ...args);
 
 interface Payment {
@@ -66,6 +68,7 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
 
   constructor() {
     super();
+    console.log("Lightning Payments Dashboard constructor called");
     dbg('constructed');
     (window as any).__LP_DEBUG__ = this; // expose instance for quick DevTools checks
     this.loadAll();
@@ -172,8 +175,8 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
       const txt = await res.text();
       this.health = { status: "Healthy", description: txt?.substring(0,120) };
     } catch (e: any) {
-      this.health = { status: "Unknown", description: e?.message };
-      dbg('GET error /health/ready', e);
+        this.health = { status: "Unknown", description: e?.message };
+        dbg('GET error /health/ready', e);
     }
   }
 
@@ -271,6 +274,7 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
   }
 
   render() {
+    console.log("Lightning Payments Dashboard render called");
     if (!this._loggedFirstRender) { this._loggedFirstRender = true; dbg('render:first'); }
     return html`
       <umb-body-layout header-transparent>
@@ -292,18 +296,23 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
           <uui-button look="secondary" @click=${this.onRefreshClick} ?disabled=${this.refreshing}>${this.refreshing ? "Refreshing…" : "Refresh"}</uui-button>
           <label class="auto"><input type="checkbox" .checked=${this.autoRefresh} @change=${this.toggleAutoRefresh} /><span>Auto-refresh</span></label>
         </div>
-        ${this.loadingStatus ? html`<div>Loading status…</div>` : this.errorStatus ? html`<uui-alert color="danger">${this.errorStatus}</uui-alert>` : html`
-          <div class="status-grid">
-            <div><strong>SDK Connected:</strong> ${this.connected ? "Yes" : "No"}</div>
-            <div><strong>Offline Mode:</strong> ${this.offlineMode ? "Yes" : "No"}</div>
-            <div><strong>Lightning Limits:</strong> ${this.minSat != null && this.maxSat != null ? `${this.minSat} – ${this.maxSat} sats` : "Unknown"}</div>
-            <div><strong>Health:</strong> ${this.health?.status ?? "Unknown"}</div>
-          </div>
-          ${this.recommendedFees ? html`<details class="fees-details"><summary>Recommended on-chain fees</summary><pre>${JSON.stringify(this.recommendedFees, null,2)}</pre></details>` : ""}
-        `}
-      </uui-box>`;
+        ${this.renderStatusContent()}
+      </uui-box>`;}
+  
+  private renderStatusContent() {
+    if (this.loadingStatus) return html`<div>Loading status…</div>`;
+    if (this.errorStatus) return html`<uui-alert color="danger">${this.errorStatus}</uui-alert>`;
+    return html`
+      <div class="status-grid">
+        <div><strong>SDK Connected:</strong> ${this.connected ? "Yes" : "No"}</div>
+        <div><strong>Offline Mode:</strong> ${this.offlineMode ? "Yes" : "No"}</div>
+        <div><strong>Lightning Limits:</strong> ${this.minSat != null && this.maxSat != null ? `${this.minSat} – ${this.maxSat} sats` : "Unknown"}</div>
+        <div><strong>Health:</strong> ${this.health?.status ?? "Unknown"}</div>
+      </div>
+      ${this.recommendedFees ? html`<details class="fees-details"><summary>Recommended on-chain fees</summary><pre>${JSON.stringify(this.recommendedFees, null,2)}</pre></details>` : ""}
+    `;
   }
-
+  
   private renderQuote() {
     return html`
       <uui-box headline="Receive fee quote" style="margin-bottom: var(--uui-size-layout-1)">
@@ -314,11 +323,9 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
         </div>
         ${this.quoteError ? html`<uui-alert color="danger">${this.quoteError}</uui-alert>` : ""}
         ${this.quoteResult ? html`<div class="quote-out">Estimated fees: <strong>${this.quoteResult.feesSat}</strong> sats (${this.quoteResult.method})</div>` : ""}
-      </uui-box>`;
-  }
-
+      </uui-box>`;}
+  
   private renderTestTools() {
-    const lightningUri = this.createdInvoice ? `lightning:${this.createdInvoice}` : null;
     return html`
       <uui-box headline="Test invoice" style="margin-bottom: var(--uui-size-layout-1)">
         <div class="test-grid">
@@ -354,33 +361,34 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
             ?disabled=${this.creatingInvoice}
           >${this.creatingInvoice ? "Creating…" : "Create invoice"}</uui-button>
         </div>
-        ${this.createdInvoice
-          ? html`
-              <div class="invoice-out">
-                ${this.invoiceQrDataUrl
-                  ? html`<img class="qr" src="${this.invoiceQrDataUrl}" alt="Invoice QR" />`
-                  : ""}
-                <div class="invoice-text">
-                  <uui-label>Invoice</uui-label>
-                  <uui-textarea
-                    readonly
-                    .value=${this.createdInvoice}
-                  ></uui-textarea>
-                  <div class="actions">
-                    <uui-button look="secondary" @click=${this.copyInvoice}>${this.copyOk ? "Copied" : "Copy"}</uui-button>
-                    ${lightningUri
-                      ? html`<a class="open-wallet" href="${lightningUri}">Open in wallet</a>`
-                      : ""}
-                  </div>
-                  <div class="hash">Payment hash: ${this.createdPaymentHash?.slice(0, 12)}…</div>
-                </div>
-              </div>
-            `
-          : ""}
+        ${this.createdInvoice ? this.renderInvoice() : ""}
       </uui-box>
-    `;
-  }
-
+    `;}
+  
+  private renderInvoice() {
+    const lightningUri = this.createdInvoice ? `lightning:${this.createdInvoice}` : null;
+    return html`
+      <div class="invoice-out">
+        ${this.invoiceQrDataUrl
+          ? html`<img class="qr" src="${this.invoiceQrDataUrl}" alt="Invoice QR" />`
+          : ""}
+        <div class="invoice-text">
+          <uui-label>Invoice</uui-label>
+          <uui-textarea
+            readonly
+            .value=${this.createdInvoice}
+          ></uui-textarea>
+          <div class="actions">
+            <uui-button look="secondary" @click=${this.copyInvoice}>${this.copyOk ? "Copied" : "Copy"}</uui-button>
+            ${lightningUri
+              ? html`<a class="open-wallet" href="${lightningUri}">Open in wallet</a>`
+              : ""}
+          </div>
+          <div class="hash">Payment hash: ${this.createdPaymentHash?.slice(0, 12)}…</div>
+        </div>
+      </div>
+    `;}
+  
   private renderPaymentsTable() {
     return html`
       <uui-box headline="Payments">
@@ -401,41 +409,45 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
             <uui-table-head-cell style="width:260px">Actions</uui-table-head-cell>
           </uui-table-head>
           <uui-table-body>
-            ${this.filteredPayments.map((payment) => {
-              const busy = !!this.rowActionBusy[payment.paymentHash];
-              const error = this.rowActionError[payment.paymentHash];
-              return html`
-                <uui-table-row>
-                  <uui-table-cell>${payment.paymentHash}</uui-table-cell>
-                  <uui-table-cell>${payment.contentId}</uui-table-cell>
-                  <uui-table-cell>${payment.userSessionId}</uui-table-cell>
-                  <uui-table-cell>${payment.status}</uui-table-cell>
-                  <uui-table-cell>
-                    <div class="row-actions">
-                      <uui-button look="secondary" compact @click=${() => this.sendRowAction("ConfirmPayment", payment.paymentHash)} ?disabled=${busy}>Confirm</uui-button>
-                      <uui-button look="warning" compact @click=${() => this.sendRowAction("MarkAsFailed", payment.paymentHash)} ?disabled=${busy}>Fail</uui-button>
-                      <uui-button look="danger" compact @click=${() => this.sendRowAction("MarkAsExpired", payment.paymentHash)} ?disabled=${busy}>Expire</uui-button>
-                      <uui-button look="secondary" compact @click=${() => this.sendRowAction("MarkAsRefundPending", payment.paymentHash)} ?disabled=${busy}>Refund pending</uui-button>
-                      <uui-button look="positive" compact @click=${() => this.sendRowAction("MarkAsRefunded", payment.paymentHash)} ?disabled=${busy}>Refunded</uui-button>
-                    </div>
-                    ${error ? html`<div class="row-error">${error}</div>` : ""}
-                  </uui-table-cell>
-                </uui-table-row>`;
-            })}
+            ${this.filteredPayments.map((payment) => this.renderPaymentRow(payment))}
           </uui-table-body>
         </uui-table>
       </uui-box>
-    `;
+    `;}
+  
+  private renderPaymentRow(payment: Payment) {
+    const busy = !!this.rowActionBusy[payment.paymentHash];
+    const error = this.rowActionError[payment.paymentHash];
+    return html`
+      <uui-table-row>
+        <uui-table-cell>${payment.paymentHash}</uui-table-cell>
+        <uui-table-cell>${payment.contentId}</uui-table-cell>
+        <uui-table-cell>${payment.userSessionId}</uui-table-cell>
+        <uui-table-cell>${payment.status}</uui-table-cell>
+        <uui-table-cell>
+          <div class="row-actions">
+            <uui-button look="secondary" compact @click=${() => this.sendRowAction("ConfirmPayment", payment.paymentHash)} ?disabled=${busy}>Confirm</uui-button>
+            <uui-button look="warning" compact @click=${() => this.sendRowAction("MarkAsFailed", payment.paymentHash)} ?disabled=${busy}>Fail</uui-button>
+            <uui-button look="danger" compact @click=${() => this.sendRowAction("MarkAsExpired", payment.paymentHash)} ?disabled=${busy}>Expire</uui-button>
+            <uui-button look="secondary" compact @click=${() => this.sendRowAction("MarkAsRefundPending", payment.paymentHash)} ?disabled=${busy}>Refund pending</uui-button>
+            <uui-button look="positive" compact @click=${() => this.sendRowAction("MarkAsRefunded", payment.paymentHash)} ?disabled=${busy}>Refunded</uui-button>
+          </div>
+          ${error ? html`<div class="row-error">${error}</div>` : ""}
+        </uui-table-cell>
+      </uui-table-row>`;
   }
-
+  
   private renderEventLog() {
     return html`
       <uui-box headline="Live events">
         <ul class="event-log">
-          ${this.eventLog.map(e => html`<li><span class="t">${e.time}</span> <strong>${e.type}</strong> <span class="d">${e.details}</span></li>`)}
+          ${this.eventLog.map(e => this.renderEventItem(e))}
         </ul>
       </uui-box>
-    `;
+    `;}
+  
+  private renderEventItem(e: { time: string; type: string; details: string }) {
+    return html`<li><span class="t">${e.time}</span> <strong>${e.type}</strong> <span class="d">${e.details}</span></li>`;
   }
 
   static styles = [
@@ -445,7 +457,7 @@ export class OurLightningPaymentsDashboardElement extends UmbLitElement {
       h2 { margin-top:0; }
       .toolbar { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; }
       .auto { display:flex; gap:0.35rem; align-items:center; color: var(--uui-color-text); }
-      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:0.5rem1rem; }
+      .status-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 0.5rem 1rem; }
       .fees-details { margin-top:0.5rem; }
       .quote-row { display:grid; grid-template-columns:1fr1fr auto; gap:0.5rem; align-items:end; }
       .quote-out { margin-top:0.5rem; }
