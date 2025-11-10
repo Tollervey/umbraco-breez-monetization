@@ -1,30 +1,41 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Tollervey.Umbraco.LightningPayments.UI.Models;
-using Umbraco.Cms.Core.Web;
+using Tollervey.Umbraco.LightningPayments.UI.Services;
 using Umbraco.Cms.Web.Common.Controllers;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Controllers
 {
+    /// <summary>
+    /// Serves .well-known endpoints related to Lightning, such as LNURL-P discovery.
+    /// </summary>
     [RequireHttps]
     public class WellKnownController : UmbracoApiControllerBase
     {
-        private readonly IUmbracoContextAccessor _umbracoContextAccessor;
         private readonly ILogger<WellKnownController> _logger;
+        private readonly IInvoiceHelper _invoiceHelper;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="WellKnownController"/> class.
+        /// </summary>
         public WellKnownController(
-            IUmbracoContextAccessor umbracoContextAccessor,
-            ILogger<WellKnownController> logger)
+            ILogger<WellKnownController> logger,
+            IInvoiceHelper invoiceHelper)
         {
-            _umbracoContextAccessor = umbracoContextAccessor;
             _logger = logger;
+            _invoiceHelper = invoiceHelper;
         }
 
+        /// <summary>
+        /// LNURL-Pay discovery endpoint for Lightning address-style lookups.
+        /// </summary>
+        /// <param name="name">The Lightning address user name segment.</param>
+        /// <param name="contentId">Optional content id to scope the paywall configuration.</param>
+        /// <returns>Standard LNURL-Pay metadata response.</returns>
         [HttpGet("/.well-known/lnurlp/{name}")]
         public IActionResult GetLightningAddress(string name, [FromQuery] int contentId)
         {
-            // Ignore name for now
-            return LnurlPayHelper.GetLnurlPayInfo(contentId, _umbracoContextAccessor, _logger, Request, "/umbraco/api/LightningPaymentsApi/GetLnurlInvoice");
+            // Delegate to shared helper that encapsulates Umbraco access and cookie handling
+            return _invoiceHelper.BuildLnurlPayInfo(contentId, Request, "/api/public/lightning/GetLnurlInvoice", _logger);
         }
     }
 }

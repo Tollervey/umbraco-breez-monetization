@@ -1,0 +1,155 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <!-- Generate XML documentation for NuGet consumers -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress missing XML docs warnings to keep builds clean while shipping docs -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <!-- Build client + copy manifest during regular Build for local F5 runs -->
+    <BuildClientOnBuild>true</BuildClientOnBuild>
+    <BuildClientOnPack>true</BuildClientOnPack>
+    <!-- Enable .NET analyzers and use the latest analysis level. Do not treat warnings as errors here to avoid breaking consumers; CI can enable that. -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+	  <PackageId>Our.Umbraco.Bitcoin.LightningPayments</PackageId>
+	  <Product>Our.Umbraco.Bitcoin.LightningPayments</Product>
+	  <Title>Bitcoin Lightning Payments for Umbraco</Title>
+	  <Authors>Andrew Tollervey</Authors>
+	  <Description>A package to extend Umbraco 16 to allow nodeless Lightning Network payments with the BreezSdk.</Description>
+	  <PackageTags>umbraco;umbraco-cms;umbraco-package;v16;lightning;bitcoin;payments</PackageTags>
+	  <PackageProjectUrl>https://github.com/Tollervey/umbraco-breez-monetization</PackageProjectUrl>
+	  <RepositoryUrl>https://github.com/Tollervey/umbraco-breez-monetization</RepositoryUrl>
+	  <RepositoryType>git</RepositoryType>
+	  <PackageReadmeFile>README.md</PackageReadmeFile>
+	  <!-- SPDX license expression; also include LICENSE file in the package -->
+	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
+	  <!-- package icon (kept small) -->
+	  <PackageIcon>icon.png</PackageIcon>
+	  <!-- Symbols and deterministic builds -->
+	  <IncludeSymbols>true</IncludeSymbols>
+	  <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	  <DebugType>portable</DebugType>
+	  <Deterministic>true</Deterministic>
+	  <PublishRepositoryUrl>true</PublishRepositoryUrl>
+	  <EmbedUntrackedSources>true</EmbedUntrackedSources>
+	  <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <PackageOutputPath>C:\LocalNuget</PackageOutputPath>
+    <Version>1.0.69</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Breez.Sdk.Liquid" Version="0.11.9" />
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
+    <PackageReference Include="Umbraco.Cms.Web.Website" Version="16.*" />
+    <PackageReference Include="Umbraco.Cms.Web.Common" Version="16.*" />
+    <PackageReference Include="Umbraco.Cms.Api.Common" Version="16.*" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" Version="16.*" />
+    <PackageReference Include="Polly" Version="8.6.4" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.13.1" />
+    <PackageReference Include="MailKit" Version="4.14.1" />
+    <!-- Nerdbank.GitVersioning to support Git-based versioning (private asset) -->
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.9.50" PrivateAssets="All" />
+    <!-- SourceLink for GitHub (private so it doesn't flow to consumers) -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <!-- .NET analyzers for improved code quality; keep as private assets so consumers don't get them transitively -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="9.0.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClientAssetsInputs Include="Client\**" Exclude="$(DefaultItemExcludes)" />
+
+    <!-- Dont include the client folder as part of packaging nuget build -->
+    <Content Remove="Client\**" />
+
+    <!-- However make the Umbraco-package.json included for dotnet pack or nuget package and visible to the solution -->
+    <None Include="Client\public\umbraco-package.json" Pack="false" />
+    <Content Include="Client\tsconfig.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\" />
+  </ItemGroup>
+
+  <!-- Include license, changelog and icon in the package -->
+  <ItemGroup>
+	  <None Include="icon.png" Pack="true" PackagePath="" />
+	  <None Include="LICENSE" Pack="true" PackagePath="" />
+	  <None Include="README.md" Pack="true" PackagePath="" />
+    <None Include="CHANGELOG.md" Pack="true" PackagePath="" />
+    <None Include="Our.Umbraco.Bitcoin.LightningPayments.csproj" />
+  </ItemGroup>
+
+  <!-- PACK pipeline (unchanged) -->
+  <Target Name="DetectNodeTools" Condition="'$(BuildClientOnPack)' == 'true'" BeforeTargets="Pack">
+    <Exec Command="node --version" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+    </Exec>
+    <Exec Command="npm --version" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="NpmExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <NodeFound Condition="'$(NodeExitCode)' == '0'">true</NodeFound>
+      <NpmFound Condition="'$(NpmExitCode)' == '0'">true</NpmFound>
+    </PropertyGroup>
+    <Error Condition="'$(NodeFound)' != 'true'" Text="Node.js is required to build client assets. Install Node.js or set BuildClientOnPack=false to skip building client assets during packing." />
+    <Error Condition="'$(NpmFound)' != 'true'" Text="npm is required to build client assets. Install npm (comes with Node.js) or set BuildClientOnPack=false to skip building client assets during packing." />
+  </Target>
+
+  <Target Name="RestoreClient" Inputs="Client\package.json;Client\package-lock.json" Outputs="Client\node_modules\.package-lock.json" DependsOnTargets="DetectNodeTools" Condition="'$(BuildClientOnPack)' == 'true' and Exists('Client\package.json')" BeforeTargets="Pack">
+    <Message Importance="high" Text="Restoring Client NPM packages (npm ci)..." />
+    <Exec Command="npm ci" WorkingDirectory="Client" />
+  </Target>
+
+  <Target Name="BuildClient" DependsOnTargets="RestoreClient" Inputs="@(ClientAssetsInputs)" Outputs="$(IntermediateOutputPath)client.complete.txt" Condition="'$(BuildClientOnPack)' == 'true' and Exists('Client\package.json')" BeforeTargets="Pack">
+    <Message Importance="high" Text="Executing Client NPM build script..." />
+    <Exec Command="npm run build" WorkingDirectory="Client" />
+    <ItemGroup>
+      <_ClientAssetsBuildOutput Include="wwwroot\App_Plugins\**" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)client.complete.txt" Lines="@(_ClientAssetsBuildOutput)" Overwrite="true" />
+  </Target>
+
+  <!-- BUILD pipeline (new): build client + copy/validate manifest for local runs -->
+  <Target Name="BuildClient_OnBuild" BeforeTargets="Build"
+          Condition="'$(BuildClientOnBuild)'=='true' and Exists('Client\package.json')">
+    <Message Importance="high" Text="Executing Client NPM build script (Build)..." />
+    <Exec Command="npm ci" WorkingDirectory="Client" />
+    <Exec Command="npm run build" WorkingDirectory="Client" />
+  </Target>
+
+  <!-- Copy the manifest from Client/public into wwwroot for BOTH Build and Pack -->
+  <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Build;Pack" DependsOnTargets="BuildClient_OnBuild;BuildClient;UpdateUmbracoPackageVersion">
+    <Message Importance="high" Text="Copying umbraco-package.json into wwwroot/App_Plugins..." />
+    <Copy
+      SourceFiles="Client\public\umbraco-package.json"
+      DestinationFiles="wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json"
+      OverWriteReadOnlyFiles="true" />
+  </Target>
+
+  <!-- Validate the copied manifest for BOTH Build and Pack -->
+  <Target Name="ValidateUmbracoManifest" BeforeTargets="Build;Pack" DependsOnTargets="CopyUmbracoPackageManifest">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$m=Get-Content -Raw 'wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json' | ConvertFrom-Json; if($null -eq $m.extensions -or $m.allowTelemetry -ne $true){ Write-Error 'umbraco-package.json must contain an extensions array and allowTelemetry:true'; exit 1 }&quot;" />
+  </Target>
+
+  <!-- Update the version in umbraco-package.json to match the Nerdbank.GitVersioning version -->
+  <Target Name="UpdateUmbracoPackageVersion" BeforeTargets="CopyUmbracoPackageManifest">
+    <Message Importance="high" Text="Updating version in Client\public\umbraco-package.json to $(Version)..." />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$json = Get-Content -Raw 'Client\public\umbraco-package.json' | ConvertFrom-Json; $json.version = '$(Version)'; $json | ConvertTo-Json -Depth 10 | Set-Content 'Client\public\umbraco-package.json'&quot;" />
+   </Target>
+</Project>

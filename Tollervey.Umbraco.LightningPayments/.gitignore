@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments/**/*.js
+wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments/**/*.map
+wwwroot/App_Plugins/Tollervey.Umbraco.LightningPayments/umbraco-package.json

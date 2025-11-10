@@ -7,33 +7,46 @@ using Umbraco.Extensions;
 
 namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
 {
+    /// <summary>
+    /// Enforces paywall rules on front-end requests by redirecting to a paywall page
+    /// when the current session has not paid for the requested content.
+    /// </summary>
     public class PaywallMiddleware
     {
         private readonly RequestDelegate _next;
+        /// <summary>
+        /// Cookie name used to identify the Lightning Payments session.
+        /// </summary>
         public const string PaywallCookieName = "LightningPaymentsSession";
 
         // Common prefixes to bypass (backoffice + our own surface controller)
         private static readonly PathString BackofficePrefix = new("/umbraco");
         private static readonly PathString PaywallSurfacePrefix = new("/umbraco/surface/paywallsurface");
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PaywallMiddleware"/> class.
+        /// </summary>
         public PaywallMiddleware(RequestDelegate next)
         {
             _next = next;
         }
 
+        /// <summary>
+        /// Middleware entry point that evaluates paywall configuration and session payment state.
+        /// </summary>
         public async Task InvokeAsync(
             HttpContext context,
             IUmbracoContextAccessor umbracoContextAccessor,
             IPaymentStateService paymentStateService)
         {
-            // 1) Bypass for non-website requests (backoffice, APIs, static, non-HTML, non-GET, our own surface endpoint)
+            //1) Bypass for non-website requests (backoffice, APIs, static, non-HTML, non-GET, our own surface endpoint)
             if (ShouldBypass(context))
             {
                 await _next(context);
                 return;
             }
 
-            // 2) Require a valid Umbraco front-end request with published content
+            //2) Require a valid Umbraco front-end request with published content
             if (!umbracoContextAccessor.TryGetUmbracoContext(out var umbracoContext) ||
                 umbracoContext.PublishedRequest?.PublishedContent == null)
             {
@@ -41,7 +54,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
                 return;
             }
 
-            // 2a) Don’t interfere with editor preview
+            //2a) Don’t interfere with editor preview
             if (umbracoContext.InPreviewMode)
             {
                 await _next(context);
@@ -50,14 +63,14 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
 
             var content = umbracoContext.PublishedRequest.PublishedContent;
 
-            // 3) Only enforce paywall if property exists and has a value
+            //3) Only enforce paywall if property exists and has a value
             if (!content.HasProperty("breezPaywall") || !content.HasValue("breezPaywall"))
             {
                 await _next(context);
                 return;
             }
 
-            // 4) Read config safely
+            //4) Read config safely
             PaywallConfig? paywallConfig = null;
             var paywallJson = content.Value<string>("breezPaywall");
             try
@@ -77,7 +90,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
                 return;
             }
 
-            // 5) If we have a session cookie and it’s paid for this content, allow through
+            //5) If we have a session cookie and it’s paid for this content, allow through
             var sessionId = context.Request.Cookies[PaywallCookieName];
             if (!string.IsNullOrEmpty(sessionId))
             {
@@ -89,7 +102,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Middleware
                 }
             }
 
-            // 6) Access denied, redirect to paywall page (we already bypass this path above to avoid loops)
+            //6) Access denied, redirect to paywall page (we already bypass this path above to avoid loops)
             var paywallUrl = $"/umbraco/surface/PaywallSurface/Index?contentId={content.Id}";
             context.Response.Redirect(paywallUrl);
         }

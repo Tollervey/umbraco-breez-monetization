@@ -12,8 +12,9 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
     /// <summary>
     /// Offline mock implementation that never calls Breez SDK but behaves as if connected.
     /// It returns a synthetic "invoice" string that embeds a payment hash and confirms it after a configurable delay.
+    /// Implements IBreezSdkHandleProvider to interop with the facade in offline mode.
     /// </summary>
-    internal sealed class OfflineBreezSdkService : IBreezSdkService
+    internal sealed class OfflineBreezSdkService : IBreezSdkService, IBreezSdkHandleProvider
     {
         private readonly ILogger<OfflineBreezSdkService> _logger;
         private readonly LightningPaymentsSettings _settings;
@@ -21,7 +22,8 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly CancellationTokenSource _cts = new();
 
-        private static readonly Regex DescriptionAllowed = new(@"^[\w\s.,'?!@#$%^&*()_+\-=\[\]{}|;:]*$", RegexOptions.Compiled);
+        // Use the centralized regex from settings to keep validation consistent
+        private static readonly Regex DescriptionAllowed = LightningPaymentsSettings.DescriptionAllowed;
 
         public OfflineBreezSdkService(
             IOptions<LightningPaymentsSettings> settings,
@@ -72,6 +74,26 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             return Task.FromResult(invoice);
         }
 
+        // New: quote expected fees for receiving a payment before creating an invoice/offer (offline ->0)
+        public Task<long> GetReceiveFeeQuoteAsync(ulong amountSat, bool bolt12 = false, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        // New: expose recommended on-chain fees (offline -> null)
+        public Task<Breez.Sdk.Liquid.RecommendedFees?> GetRecommendedFeesAsync(CancellationToken ct = default)
+            => Task.FromResult<Breez.Sdk.Liquid.RecommendedFees?>(null);
+
+        // New: offline implementation returns null; controller will use its regex fallback in offline mode.
+        public Task<string?> TryExtractPaymentHashAsync(string invoice, CancellationToken ct = default)
+            => Task.FromResult<string?>(null);
+
+        // New: offline impl just returns null (no backing data)
+        public Task<Breez.Sdk.Liquid.Payment?> GetPaymentByHashAsync(string paymentHash, CancellationToken ct = default)
+            => Task.FromResult<Breez.Sdk.Liquid.Payment?>(null);
+
+        // New: offline impl does not embed expiry; return null to indicate unknown
+        public Task<DateTimeOffset?> TryExtractInvoiceExpiryAsync(string invoice, CancellationToken ct = default)
+            => Task.FromResult<DateTimeOffset?>(null);
+
         public ValueTask DisposeAsync()
         {
             _cts.Cancel();
@@ -79,11 +101,15 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
             return ValueTask.CompletedTask;
         }
 
+        // IBreezSdkHandleProvider: offline -> no handle
+        public Task<Breez.Sdk.Liquid.BindingLiquidSdk?> GetSdkAsync(CancellationToken ct = default)
+            => Task.FromResult<Breez.Sdk.Liquid.BindingLiquidSdk?>(null);
+
         private void Validate(ulong amountSat, string description)
         {
-            if (amountSat == 0 || amountSat > _settings.MaxInvoiceAmountSat)
+            if (amountSat ==0 || amountSat > _settings.MaxInvoiceAmountSat)
             {
-                throw new InvalidInvoiceRequestException($"Invoice amount must be between 1 and {_settings.MaxInvoiceAmountSat} sats.");
+                throw new InvalidInvoiceRequestException($"Invoice amount must be between1 and {_settings.MaxInvoiceAmountSat} sats.");
             }
             if (string.IsNullOrWhiteSpace(description) ||
                 description.Length > _settings.MaxInvoiceDescriptionLength ||
@@ -95,7 +121,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
 
         private static string GeneratePaymentHash()
         {
-            // 32 bytes => 64 hex chars
+            //32 bytes =>64 hex chars
             Span<byte> bytes = stackalloc byte[32];
             RandomNumberGenerator.Fill(bytes);
             return Convert.ToHexString(bytes).ToLowerInvariant();
@@ -111,7 +137,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         private bool ShouldSimulateFailure()
         {
             var r = _offlineOptions.SimulatedFailureRate;
-            if (r <= 0) return false;
+            if (r <=0) return false;
             return Random.Shared.NextDouble() < r;
         }
 

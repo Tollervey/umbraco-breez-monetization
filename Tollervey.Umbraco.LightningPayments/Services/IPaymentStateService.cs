@@ -19,7 +19,7 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// Confirms a payment asynchronously.
         /// </summary>
         /// <param name="paymentHash">The unique hash of the payment.</param>
-        /// <returns>True if confirmed, false otherwise.</returns>
+        /// <returns>A <see cref="PaymentConfirmationResult"/> describing the outcome.</returns>
         Task<PaymentConfirmationResult> ConfirmPaymentAsync(string paymentHash);
 
         /// <summary>
@@ -62,12 +62,47 @@ namespace Tollervey.Umbraco.LightningPayments.UI.Services
         /// <param name="paymentHash">The unique hash of the payment.</param>
         /// <returns>True if updated, false otherwise.</returns>
         Task<bool> MarkAsRefundedAsync(string paymentHash);
+
+        /// <summary>
+        /// Sets the metadata for a payment, such as amount and kind.
+        /// </summary>
+        /// <param name="paymentHash">The unique hash of the payment.</param>
+        /// <param name="amountSat">The amount in satoshis.</param>
+        /// <param name="kind">The kind of payment.</param>
+        Task SetPaymentMetadataAsync(string paymentHash, ulong amountSat, PaymentKind kind);
+
+        /// <summary>
+        /// Gets a payment state by its payment hash.
+        /// </summary>
+        Task<PaymentState?> GetByPaymentHashAsync(string paymentHash);
+
+        /// <summary>
+        /// Attempts to get an IdempotencyMapping by key.
+        /// </summary>
+        Task<IdempotencyMapping?> TryGetMappingByKeyAsync(string idempotencyKey);
+
+        /// <summary>
+        /// Attempts to atomically create a new IdempotencyMapping if key does not exist. Returns existing mapping if present.
+        /// </summary>
+        Task<(IdempotencyMapping mapping, bool created)> TryCreateMappingAsync(string idempotencyKey, string paymentHash, string invoice);
     }
 
+    /// <summary>
+    /// Result of attempting to confirm a payment.
+    /// </summary>
     public enum PaymentConfirmationResult
     {
+        /// <summary>
+        /// The payment moved from Pending to Paid.
+        /// </summary>
         Confirmed,
+        /// <summary>
+        /// The payment was already confirmed earlier.
+        /// </summary>
         AlreadyConfirmed,
+        /// <summary>
+        /// No confirmable record was found.
+        /// </summary>
         NotFound
     }
 }

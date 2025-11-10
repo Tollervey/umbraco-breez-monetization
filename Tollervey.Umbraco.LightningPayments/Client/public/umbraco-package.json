@@ -1,14 +1,14 @@
 {
-  "id": "MyExtension",
-  "name": "MyExtension",
-  "version": "0.0.0",
+  "id": "Tollervey.Umbraco.LightningPayments",
+  "name": "Lightning Payments",
+  "version": "99.0.0",
   "allowTelemetry": true,
   "extensions": [
     {
-      "name": "My Extension Bundle",
-      "alias": "MyExtension.Bundle",
+      "name": "Lightning Payments Bundle",
+      "alias": "Tollervey.Umbraco.LightningPayments.Bundle",
       "type": "bundle",
-      "js": "/App_Plugins/MyExtension/my-extension.js"
+      "js": "/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js"
     }
   ]
 }

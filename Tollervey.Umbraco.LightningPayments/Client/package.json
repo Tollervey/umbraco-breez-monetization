@@ -8,8 +8,13 @@
     "build": "tsc && vite build",
     "generate-client": "node scripts/generate-openapi.js https://localhost:5000/umbraco/swagger/myextension/swagger.json"
   },
+  "dependencies": {
+    "lit": "^3.1.2",
+    "qrcode": "^1.5.3"
+  },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.81.1",
+    "@types/qrcode": "^1.5.6",
     "@umbraco-cms/backoffice": "^16.3.1",
     "chalk": "^5.6.0",
     "cross-env": "^10.0.0",

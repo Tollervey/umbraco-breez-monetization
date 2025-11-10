@@ -1,0 +1,16 @@
+@{
+  var version = typeof(Tollervey.Umbraco.LightningPayments.UI.Configuration.RuntimeFeatureFlags)
+      .Assembly.GetName().Version?.ToString() ?? "0";
+  var scriptUrl = Url.Content("~/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js") + "?v=" + version;
+}
+<script>
+  (function(){
+    if (!window.__lpClientLoaded) {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.src = '@scriptUrl';
+      document.head.appendChild(s);
+      window.__lpClientLoaded = true;
+    }
+  })();
+</script>

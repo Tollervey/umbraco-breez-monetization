@@ -1,0 +1,11 @@
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
+@inject Tollervey.Umbraco.LightningPayments.UI.Services.IRuntimeSettingsService Runtime
+@{
+  var flags = await Runtime.GetAsync();
+  if (!flags.Enabled || !flags.TipJarEnabled)
+  {
+      if (flags.HideUiWhenDisabled) { return; }
+  }
+}
+@await Html.PartialAsync("LightningPayments/_ClientLoader")
+<breez-tip-jar title="Buy me a coffee" description="Thanks for your support!" defaultamount="1000"></breez-tip-jar>

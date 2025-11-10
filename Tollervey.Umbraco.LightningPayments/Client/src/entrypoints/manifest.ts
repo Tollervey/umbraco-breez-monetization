@@ -1,8 +1,8 @@
-export const manifests: Array<UmbExtensionManifest> = [
+export const manifests = [
   {
-    name: "My Extension Entrypoint",
-    alias: "MyExtension.Entrypoint",
-    type: "backofficeEntryPoint",
-    js: () => import("./entrypoint.js"),
-  },
+    type: 'backofficeEntryPoint',
+    alias: 'Tollervey.Umbraco.LightningPayments.Entrypoint',
+    name: 'Lightning Payments Entrypoint',
+    js: () => import('./entrypoint.js')
+  }
 ];
