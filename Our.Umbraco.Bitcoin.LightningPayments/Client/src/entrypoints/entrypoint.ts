@@ -4,10 +4,13 @@ import type {
 } from "@umbraco-cms/backoffice/extension-api";
 import { UMB_AUTH_CONTEXT } from "@umbraco-cms/backoffice/auth";
 import { client } from "../api/client.gen.js";
+import { manifests as propertyEditors } from "../property-editors/manifest.js";
 
 // load up the manifests here
 export const onInit: UmbEntryPointOnInit = (_host, _extensionRegistry) => {
   console.log("Hello from my extension 🎉");
+  // Register property editors
+  _extensionRegistry.registerMany(propertyEditors);
   // Will use only to add in Open API config with generated TS OpenAPI HTTPS Client
   // Do the OAuth token handshake stuff
   _host.consumeContext(UMB_AUTH_CONTEXT as any, async (authContext: any) => {
