@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
+using Our.Umbraco.Bitcoin.LightningPayments.Services;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 
@@ -13,15 +14,17 @@ public class PackageDiagnosticsComponent : IComponent
 {
     private readonly ILogger<PackageDiagnosticsComponent> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly IPaywallMessageService _paywallMessageService;
 
     private const string PackageFolderName = "Our.Umbraco.Bitcoin.LightningPayments";
     private const string PluginDirRelative = $"App_Plugins/{PackageFolderName}";
     private static readonly string[] ProbeFiles = ["umbraco-package.json", "lightning-ui.js"];
 
-    public PackageDiagnosticsComponent(ILogger<PackageDiagnosticsComponent> logger, IWebHostEnvironment env)
+    public PackageDiagnosticsComponent(ILogger<PackageDiagnosticsComponent> logger, IWebHostEnvironment env, IPaywallMessageService paywallMessageService)
     {
         _logger = logger;
         _env = env;
+        _paywallMessageService = paywallMessageService;
     }
 
     public void Initialize()
@@ -29,6 +32,7 @@ public class PackageDiagnosticsComponent : IComponent
         try
         {
             _logger.LogInformation("LightningPayments diagnostics: WebRootPath={WebRootPath}", _env.WebRootPath ?? "(null)");
+            _logger.LogInformation("Paywall message: {Message}", _paywallMessageService.GetMessage());
             var fp = _env.WebRootFileProvider;
 
             // Probe physical /App_Plugins (when assets copied to site)
@@ -162,6 +166,8 @@ public class PackageDiagnosticsComponent : IComponent
 
     public void Terminate() { }
 }
+
+   
 
 
 

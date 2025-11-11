@@ -16,6 +16,11 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
         string GetMessage();
 
         /// <summary>
+        /// Sets the paywall message.
+        /// </summary>
+        void SetMessage(string message);
+
+        /// <summary>
         /// Validates a paywall message.
         /// </summary>
         bool IsValidMessage(string message);
