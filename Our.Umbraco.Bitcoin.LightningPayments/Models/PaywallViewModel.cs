@@ -19,5 +19,10 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Models
         /// The fee in satoshis required to unlock the content.
         /// </summary>
         public ulong Fee { get; set; }
+
+        /// <summary>
+        /// The custom paywall message to display.
+        /// </summary>
+        public string CustomMessage { get; set; } = string.Empty;
     }
 }

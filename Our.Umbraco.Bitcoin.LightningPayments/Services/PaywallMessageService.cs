@@ -20,6 +20,11 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
         public string GetDefaultMessage() => "Default paywall message";
 
         /// <summary>
+        /// Gets the paywall message.
+        /// </summary>
+        public string GetMessage() => GetDefaultMessage();
+
+        /// <summary>
         /// Validates a paywall message (e.g., not null/empty, length check).
         /// </summary>
         public bool IsValidMessage(string message)
