@@ -13,7 +13,7 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Models
         /// <summary>
         /// HTML preview content shown when the page is locked.
         /// </summary>
-        public string PreviewContent { get; set; } = string.Empty;
+        public string? PreviewContent { get; set; } = string.Empty;
 
         /// <summary>
         /// The fee in satoshis required to unlock the content.
@@ -23,6 +23,6 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Models
         /// <summary>
         /// The custom paywall message to display.
         /// </summary>
-        public string CustomMessage { get; set; } = string.Empty;
+        public string? CustomMessage { get; set; } = string.Empty;
     }
 }

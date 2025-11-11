@@ -8,7 +8,7 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
     public class PaywallMessageService : IPaywallMessageService
     {
         private readonly ILogger<PaywallMessageService> _logger;
-        private static string _customMessage = "Default paywall message";
+        private static string? _customMessage = "Default paywall message";
 
         public PaywallMessageService(ILogger<PaywallMessageService> logger)
         {
@@ -23,12 +23,12 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
         /// <summary>
         /// Gets the paywall message.
         /// </summary>
-        public string GetMessage() => _customMessage;
+        public string GetMessage() => _customMessage ?? GetDefaultMessage();
 
         /// <summary>
         /// Sets the paywall message.
         /// </summary>
-        public void SetMessage(string message)
+        public void SetMessage(string? message)
         {
             if (IsValidMessage(message))
             {
@@ -40,7 +40,7 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
         /// <summary>
         /// Validates a paywall message (e.g., not null/empty, length check).
         /// </summary>
-        public bool IsValidMessage(string message)
+        public bool IsValidMessage(string? message)
         {
             if (string.IsNullOrWhiteSpace(message))
             {

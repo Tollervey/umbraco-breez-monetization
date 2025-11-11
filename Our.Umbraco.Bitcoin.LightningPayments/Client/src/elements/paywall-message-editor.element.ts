@@ -1,8 +1,9 @@
-import { UmbLitElement } from '@umbraco-cms/backoffice/lit-element';
-import { html, css, customElement, property } from '@umbraco-cms/backoffice/external/lit';
+// Per V14 Great Leap: Lit Equivalent for backoffice property editors
+import { html, css, LitElement } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
 
-@customElement('paywall-message-editor')
-export class PaywallMessageEditorElement extends UmbLitElement {
+@customElement('our-umbraco-bitcoin-lightning-payments-paywall-message-editor')
+export class PaywallMessageEditorElement extends LitElement {
     @property({ type: String })
     value?: string;
 
@@ -34,6 +35,6 @@ export default PaywallMessageEditorElement;
 
 declare global {
     interface HTMLElementTagNameMap {
-        'paywall-message-editor': PaywallMessageEditorElement;
+        'our-umbraco-bitcoin-lightning-payments-paywall-message-editor': PaywallMessageEditorElement;
     }
 }
