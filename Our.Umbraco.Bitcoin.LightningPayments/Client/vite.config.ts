@@ -9,7 +9,7 @@ export default defineConfig({
                 // Build the website element
                 "simple-poc-element": "src/elements/simple-poc-element.element.ts",
                 // Build the paywall message editor
-                "paywall-message-editor": "src/property-editors/paywall-message-editor.element.ts"
+                "paywall-message-editor": "src/elements/paywall-message-editor.element.ts"
             },
             formats: ["es"],
         },
