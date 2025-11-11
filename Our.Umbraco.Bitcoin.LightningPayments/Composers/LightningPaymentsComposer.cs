@@ -48,6 +48,8 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Composers
             builder.Components().Append<BreezSdkComponent>();
             builder.Components().Append<PackageDiagnosticsComponent>(); // add this line
 
+            // POC: Paywall message feature - no additional services needed for client-side property editor
+
             // Swagger is intentionally not registered here to avoid forcing a transitive dependency.
             // Consumers can add Swagger in their host application if desired.
 

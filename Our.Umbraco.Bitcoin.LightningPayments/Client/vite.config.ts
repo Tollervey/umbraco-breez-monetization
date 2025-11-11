@@ -7,7 +7,9 @@ export default defineConfig({
                 // Build the dashboard web component from the correct source file
                 "dashboard.element": "src/dashboards/dashboard.element.ts",
                 // Build the website element
-                "simple-poc-element": "src/elements/simple-poc-element.element.ts"
+                "simple-poc-element": "src/elements/simple-poc-element.element.ts",
+                // Build the paywall message editor
+                "paywall-message-editor": "src/property-editors/paywall-message-editor.element.ts"
             },
             formats: ["es"],
         },

@@ -1,0 +1,11 @@
+@using Umbraco.Cms.Web.Common.PublishedModels;
+@{
+    // POC: Render the paywall message if the current content has a "paywallMessage" property
+    var paywallMessage = Model.Content.GetProperty("paywallMessage")?.GetValue()?.ToString();
+    if (!string.IsNullOrEmpty(paywallMessage))
+    {
+        <div class="paywall-message">
+            <p>@Html.Raw(paywallMessage)</p>
+        </div>
+    }
+}
