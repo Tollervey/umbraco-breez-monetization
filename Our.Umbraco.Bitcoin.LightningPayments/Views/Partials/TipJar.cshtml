@@ -1,4 +1,8 @@
-@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Our.Umbraco.Bitcoin.LightningPayments.Models.TipJarViewModel>
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Our.Umbraco.Bitcoin.LightningPayments.Models.PaywallViewModel>
+
+<div class="paywall-message">@Model.CustomMessage</div>
+
+@* @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Our.Umbraco.Bitcoin.LightningPayments.Models.TipJarViewModel>
 @using Our.Umbraco.Bitcoin.LightningPayments.Models
 @inject Our.Umbraco.Bitcoin.LightningPayments.Services.IRuntimeSettingsService Runtime
 @{
@@ -27,4 +31,4 @@
         }
     })();
 </script>
-<breez-tip-jar title="@title" description="@description" defaultamount="@defaultAmount" amounts="@amounts" content-id="@contentId"></breez-tip-jar>
+<breez-tip-jar title="@title" description="@description" defaultamount="@defaultAmount" amounts="@amounts" content-id="@contentId"></breez-tip-jar> *@

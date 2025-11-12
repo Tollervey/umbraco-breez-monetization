@@ -89,6 +89,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Views\Partials\LightningPayments\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
@@ -132,8 +133,7 @@
   </Target>
 
   <!-- BUILD pipeline (new): build client + copy/validate manifest for local runs -->
-  <Target Name="BuildClient_OnBuild" BeforeTargets="Build"
-          Condition="'$(BuildClientOnBuild)'=='true' and Exists('Client\package.json')">
+  <Target Name="BuildClient_OnBuild" BeforeTargets="Build" Condition="'$(BuildClientOnBuild)'=='true' and Exists('Client\package.json')">
     <Message Importance="high" Text="Executing Client NPM build script (Build)..." />
     <Exec Command="npm ci" WorkingDirectory="Client" />
     <Exec Command="npm run build" WorkingDirectory="Client" />
@@ -142,10 +142,7 @@
   <!-- Copy the manifest from Client/public into wwwroot for BOTH Build and Pack -->
   <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Build;Pack" DependsOnTargets="BuildClient_OnBuild;BuildClient;UpdateUmbracoPackageVersion">
     <Message Importance="high" Text="Copying umbraco-package.json into wwwroot/App_Plugins..." />
-    <Copy
-      SourceFiles="Client\public\umbraco-package.json"
-      DestinationFiles="wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json"
-      OverWriteReadOnlyFiles="true" />
+    <Copy SourceFiles="Client\public\umbraco-package.json" DestinationFiles="wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json" OverWriteReadOnlyFiles="true" />
   </Target>
 
   <!-- Validate the copied manifest for BOTH Build and Pack -->
