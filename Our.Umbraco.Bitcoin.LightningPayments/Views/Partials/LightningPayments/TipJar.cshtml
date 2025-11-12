@@ -1,0 +1,39 @@
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
+@using System.Text.Json
+@using Our.Umbraco.Bitcoin.LightningPayments.Models
+@using Umbraco.Cms.Core.Models.PublishedContent
+@using Umbraco.Extensions
+@inject Our.Umbraco.Bitcoin.LightningPayments.Services.IRuntimeSettingsService Runtime
+@{
+  var flags = await Runtime.GetAsync();
+  if (!flags.Enabled || !flags.TipJarEnabled)
+  {
+      if (flags.HideUiWhenDisabled) { return; }
+  }
+
+  var tipJarJson = (Model as IPublishedContent)?.Value<string>("breezTipJar");
+  TipJarConfig? config = null;
+  if (!string.IsNullOrEmpty(tipJarJson))
+  {
+      config = JsonSerializer.Deserialize<TipJarConfig>(tipJarJson);
+  }
+
+  var title = config?.Enabled == true ? config.Label : "Buy me a coffee";
+  var description = "Thanks for your support!";
+  var defaultAmount = config?.Enabled == true && config.DefaultAmounts.Length > 0 ? config.DefaultAmounts[0] : 1000UL;
+  var amounts = config?.Enabled == true ? string.Join(",", config.DefaultAmounts) : "500,1000,2500";
+  var contentId = (Model as IPublishedContent)?.Id ?? 0;
+}
+<script>
+  // idempotent client loader
+  (function(){
+    if (!window.__lpClientLoaded) {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.src = '/App_Plugins/Tollervey.Umbraco.LightningPayments/lightning-ui.js';
+      document.head.appendChild(s);
+      window.__lpClientLoaded = true;
+    }
+  })();
+</script>
+<breez-tip-jar title="@title" description="@description" defaultamount="@defaultAmount" amounts="@amounts" content-id="@contentId"></breez-tip-jar>
