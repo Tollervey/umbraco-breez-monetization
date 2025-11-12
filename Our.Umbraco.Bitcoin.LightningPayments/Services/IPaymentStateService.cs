@@ -85,6 +85,12 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
         /// Attempts to atomically create a new IdempotencyMapping if key does not exist. Returns existing mapping if present.
         /// </summary>
         Task<(IdempotencyMapping mapping, bool created)> TryCreateMappingAsync(string idempotencyKey, string paymentHash, string invoice);
+
+        /// <summary>
+        /// Checks if the payment state service is healthy and operational.
+        /// </summary>
+        /// <returns>True if the service is healthy, false otherwise.</returns>
+        Task<bool> IsServiceHealthyAsync();
     }
 
     /// <summary>

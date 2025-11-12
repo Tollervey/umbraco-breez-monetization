@@ -5,7 +5,7 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
 {
     /// <summary>
     /// Persistent implementation of IPaymentStateService using Entity Framework Core and SQLite.
-    /// </summary>
+    /// </summary>IsServiceH
     public class PersistentPaymentStateService : IPaymentStateService
     {
         private readonly PaymentDbContext _context;
@@ -285,6 +285,21 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
             catch (Exception ex)
             {
                 throw new PaymentException("Failed to create idempotency mapping.", ex);
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task<bool> IsServiceHealthyAsync()
+        {
+            try
+            {
+                // Check if the database connection is healthy by attempting to connect
+                return await _context.Database.CanConnectAsync();
+            }
+            catch
+            {
+                // If any exception occurs, consider the service unhealthy
+                return false;
             }
         }
     }

@@ -82,6 +82,8 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Composers
             // Remove deduper registrations if present (now unused). This is just a comment for future reference:
             // builder.Services.Remove(ServiceDescriptor.Singleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>());
 
+            builder.Services.AddHealthChecks()
+                .AddCheck<LightningPaymentsHealthCheck>("Lightning Payments");
         }
     }
 }

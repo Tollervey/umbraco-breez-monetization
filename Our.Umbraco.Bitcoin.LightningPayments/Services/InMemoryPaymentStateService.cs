@@ -218,6 +218,13 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Services
             var created = mapping.PaymentHash == paymentHash && mapping.Invoice == invoice && mapping.CreatedAt.AddSeconds(1) >= DateTime.UtcNow;
             return Task.FromResult((mapping, created));
         }
+
+        /// <inheritdoc />
+        public Task<bool> IsServiceHealthyAsync()
+        {
+            // For in-memory implementation, always consider healthy
+            return Task.FromResult(true);
+        }
     }
 }
 
