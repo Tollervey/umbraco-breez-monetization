@@ -23,7 +23,7 @@
 	  <Title>Bitcoin Lightning Payments for Umbraco</Title>
 	  <Authors>Andrew Tollervey</Authors>
 	  <Description>A package to extend Umbraco 16 to allow nodeless Lightning Network payments with the BreezSdk.</Description>
-	  <PackageTags>umbraco;umbraco-cms;umbraco-package;v16;lightning;bitcoin;payments</PackageTags>
+	  <PackageTags>umbraco;umbraco-cms;umbraco-package;v16;lightning;bitcoin;payments;umbraco-marketplace</PackageTags>
 	  <PackageProjectUrl>https://github.com/Tollervey/umbraco-breez-monetization</PackageProjectUrl>
 	  <RepositoryUrl>https://github.com/Tollervey/umbraco-breez-monetization</RepositoryUrl>
 	  <RepositoryType>git</RepositoryType>
