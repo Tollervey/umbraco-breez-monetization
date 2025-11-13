@@ -1,7 +1,7 @@
 {
     "id":  "Our.Umbraco.Bitcoin.LightningPayments",
     "name":  "Our.Umbraco.Bitcoin.LightningPayments",
-    "version":  "1.0.18-preview-gfcfc6df014",
+    "version":  "1.0.3-preview-gf8d7e3d800",
     "allowTelemetry":  true,
     "extensions":  [
                        {

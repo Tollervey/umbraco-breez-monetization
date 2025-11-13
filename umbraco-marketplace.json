@@ -1,0 +1,15 @@
+{
+  "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+  "AuthorDetails": {
+    "Name": "Andrew Tollervey",
+    "Url": "https://github.com/Tollervey",
+    "SyncContributorsFromRepository": true
+  },
+  "Categories": "Commerce",
+  "LicenseTypes": ["Free"],
+  "PackageType": "Package",
+  "DocumentationUrl": "https://github.com/Tollervey/umbraco-breez-monetization#readme",
+  "IssueTrackerUrl": "https://github.com/Tollervey/umbraco-breez-monetization/issues",
+  "Tags": ["bitcoin", "lightning", "payments", "cryptocurrency"],
+  "VersionDependencyMode": "SemVer"
+}
