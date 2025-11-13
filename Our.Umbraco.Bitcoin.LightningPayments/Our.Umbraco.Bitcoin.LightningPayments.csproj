@@ -89,7 +89,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Views\Partials\LightningPayments\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
