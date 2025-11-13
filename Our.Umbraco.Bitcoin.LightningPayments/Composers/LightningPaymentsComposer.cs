@@ -9,6 +9,9 @@ using Our.Umbraco.Bitcoin.LightningPayments.Components;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
+using Our.Umbraco.Bitcoin.LightningPayments.Notifications;
+using Our.Umbraco.Bitcoin.LightningPayments.Services;
+using Umbraco.Cms.Core.Notifications;
 
 namespace Our.Umbraco.Bitcoin.LightningPayments.Composers
 {
@@ -48,6 +51,12 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Composers
             builder.Components().Append<BreezSdkComponent>();
             builder.Components().Append<PackageDiagnosticsComponent>(); // add this line
 
+            // POC: Register paywall message service
+            builder.Services.AddSingleton<IPaywallMessageService, PaywallMessageService>();
+
+            // POC: Register notification handler for content events
+            builder.AddNotificationHandler<ContentPublishedNotification, PaywallMessageNotificationHandler>();
+
             // Swagger is intentionally not registered here to avoid forcing a transitive dependency.
             // Consumers can add Swagger in their host application if desired.
 
@@ -73,6 +82,8 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Composers
             // Remove deduper registrations if present (now unused). This is just a comment for future reference:
             // builder.Services.Remove(ServiceDescriptor.Singleton<IPaymentEventDeduper, MemoryPaymentEventDeduper>());
 
+            builder.Services.AddHealthChecks()
+                .AddCheck<LightningPaymentsHealthCheck>("Lightning Payments");
         }
     }
 }

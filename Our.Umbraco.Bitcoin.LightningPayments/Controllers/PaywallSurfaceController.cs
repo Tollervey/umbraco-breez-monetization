@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Our.Umbraco.Bitcoin.LightningPayments.Models;
+using Our.Umbraco.Bitcoin.LightningPayments.Services;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Logging;
 using Umbraco.Cms.Core.Routing;
@@ -18,15 +19,19 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Controllers
     [RequireHttps]
     public class PaywallSurfaceController : SurfaceController
     {
+        private readonly IPaywallMessageService _paywallMessageService;
+
         public PaywallSurfaceController(
             IUmbracoContextAccessor umbracoContextAccessor,
             IUmbracoDatabaseFactory databaseFactory,
             ServiceContext services,
             AppCaches appCaches,
             IProfilingLogger profilingLogger,
-            IPublishedUrlProvider publishedUrlProvider)
+            IPublishedUrlProvider publishedUrlProvider,
+            IPaywallMessageService paywallMessageService)
             : base(umbracoContextAccessor, databaseFactory, services, appCaches, profilingLogger, publishedUrlProvider)
         {
+            _paywallMessageService = paywallMessageService;
         }
 
         /// <summary>
@@ -68,7 +73,8 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Controllers
             {
                 ContentId = contentId,
                 PreviewContent = previewContent,
-                Fee = paywallConfig?.Fee ?? 0
+                Fee = paywallConfig?.Fee ?? 0,
+                CustomMessage = _paywallMessageService.GetMessage()
             };
 
             return View("Index", model);

@@ -1,7 +1,7 @@
 {
     "id":  "Our.Umbraco.Bitcoin.LightningPayments",
     "name":  "Our.Umbraco.Bitcoin.LightningPayments",
-    "version":  "1.0.1-preview-gfe3e1d4c4d",
+    "version":  "1.0.18-preview-gfcfc6df014",
     "allowTelemetry":  true,
     "extensions":  [
                        {
@@ -30,6 +30,17 @@
                                                   "match":  "lightningPayments"
                                               }
                                           ]
+                       },
+                       {
+                           "type":  "propertyEditorUi",
+                           "alias":  "our.umbraco.bitcoin.lightning.payments.paywallMessage",
+                           "name":  "Paywall Message Editor",
+                           "element":  "/App_Plugins/OurUmbracoBitcoinLightningPayments/paywall-message-editor.js",
+                           "meta":  {
+                                        "label":  "Paywall Message Editor",
+                                        "icon":  "icon-message",
+                                        "group":  "payments"
+                                    }
                        }
                    ]
 }

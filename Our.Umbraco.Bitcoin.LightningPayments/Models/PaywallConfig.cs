@@ -18,5 +18,17 @@ namespace Our.Umbraco.Bitcoin.LightningPayments.Models
         /// </summary>
         [JsonPropertyName("fee")]
         public ulong Fee { get; set; }
+
+        /// <summary>
+        /// The message to display for the paywall.
+        /// </summary>
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+
+        /// <summary>
+        /// Custom paywall message for the POC.
+        /// </summary>
+        [JsonPropertyName("customMessage")]
+        public string CustomMessage { get; set; } = "Default paywall message";
     }
 }

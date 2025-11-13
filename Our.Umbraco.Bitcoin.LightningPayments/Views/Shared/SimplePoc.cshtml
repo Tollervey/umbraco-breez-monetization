@@ -1,0 +1,14 @@
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<dynamic>
+<script>
+    // Idempotent client loader for the PoC element
+    (function(){
+        if (!window.__ourLpPocLoaded) {
+            const s = document.createElement('script');
+            s.type = 'module';
+            s.src = '/App_Plugins/OurUmbracoBitcoinLightningPayments/simple-poc-element.js';
+            document.head.appendChild(s);
+            window.__ourLpPocLoaded = true;
+        }
+    })();
+</script>
+<simple-poc-element></simple-poc-element>

@@ -51,11 +51,17 @@
   <ItemGroup>
     <PackageReference Include="Breez.Sdk.Liquid" Version="0.11.9" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.13.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" PrivateAssets="All" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.10" PrivateAssets="All" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="16.*" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="16.*" />
     <PackageReference Include="Umbraco.Cms.Api.Common" Version="16.*" />
@@ -126,8 +132,7 @@
   </Target>
 
   <!-- BUILD pipeline (new): build client + copy/validate manifest for local runs -->
-  <Target Name="BuildClient_OnBuild" BeforeTargets="Build"
-          Condition="'$(BuildClientOnBuild)'=='true' and Exists('Client\package.json')">
+  <Target Name="BuildClient_OnBuild" BeforeTargets="Build" Condition="'$(BuildClientOnBuild)'=='true' and Exists('Client\package.json')">
     <Message Importance="high" Text="Executing Client NPM build script (Build)..." />
     <Exec Command="npm ci" WorkingDirectory="Client" />
     <Exec Command="npm run build" WorkingDirectory="Client" />
@@ -136,10 +141,7 @@
   <!-- Copy the manifest from Client/public into wwwroot for BOTH Build and Pack -->
   <Target Name="CopyUmbracoPackageManifest" BeforeTargets="Build;Pack" DependsOnTargets="BuildClient_OnBuild;BuildClient;UpdateUmbracoPackageVersion">
     <Message Importance="high" Text="Copying umbraco-package.json into wwwroot/App_Plugins..." />
-    <Copy
-      SourceFiles="Client\public\umbraco-package.json"
-      DestinationFiles="wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json"
-      OverWriteReadOnlyFiles="true" />
+    <Copy SourceFiles="Client\public\umbraco-package.json" DestinationFiles="wwwroot\App_Plugins\OurUmbracoBitcoinLightningPayments\umbraco-package.json" OverWriteReadOnlyFiles="true" />
   </Target>
 
   <!-- Validate the copied manifest for BOTH Build and Pack -->
